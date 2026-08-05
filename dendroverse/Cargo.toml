@@ -1,0 +1,8 @@
+[package]
+name = "dendroverse"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+arboretum-td = "0.1.0"
