@@ -11,10 +11,10 @@ pub(super) enum SolutionAlgorithm<MemoType, AdditionalDataType> {
 
 
 pub(super) struct NiceDTDPayloads<MemoType, AdditionalDataType> {
-    leaf_payload: fn(&Vec<usize>, &mut MemoType, &AdditionalDataType),
+    leaf_payload: fn(&mut MemoType, &Vec<usize>, &AdditionalDataType),
     introduce_payload: fn(&mut MemoType, &Vec<usize>, &MemoType, &Vec<usize>, &AdditionalDataType),
     forget_payload: fn(&mut MemoType, &Vec<usize>, &MemoType, &Vec<usize>, &AdditionalDataType),
-    join_payload: fn(&Vec<usize>, &mut MemoType, &MemoType, &MemoType, &AdditionalDataType),
+    join_payload: fn(&mut MemoType, &Vec<usize>, &MemoType, &MemoType, &AdditionalDataType),
 }
 
 
@@ -126,11 +126,9 @@ where
 
             NiceDTDJob::Leaf(job_info) => {
                 let mut node = job_info.node.lock().unwrap();
-                let mut memo = MemoType::default();
+                let crate::dtd::DTDNode::<MemoType> { bag: node_bag, memo: node_memo, .. } = &mut *node;
 
-                (payloads.leaf_payload)(&node.bag, &mut memo, additional_data);
-
-                node.memo = Some(memo);
+                (payloads.leaf_payload)(node_memo, node_bag, additional_data);
 
                 completed_jobs_tx.send(job_info.nid).unwrap();
             },
@@ -143,7 +141,7 @@ where
                 (payloads.forget_payload)(
                     &mut intermediate_memo,
                     &child_node.bag,
-                    child_node.memo.as_ref().unwrap(),
+                    &child_node.memo,
                     &job_info.forgotten_vids,
                     additional_data,
                 );
@@ -157,7 +155,7 @@ where
                     .collect();
 
                 (payloads.introduce_payload)(
-                    node.memo.as_mut().unwrap(),
+                    &mut node.memo,
                     &intermediate_bag,
                     &intermediate_memo,
                     &job_info.introduced_vids,
@@ -167,9 +165,23 @@ where
                 completed_jobs_tx.send(job_info.nid).unwrap();
             },
 
-            NiceDTDJob::Terminate => break,
+            NiceDTDJob::Join(job_info) => {
+                let mut node = job_info.node.lock().unwrap();
+                let child_node1 = job_info.child_node1.lock().unwrap();
+                let child_node2 = job_info.child_node2.lock().unwrap();
 
-            _ => todo!("Implement all other node types."),
+                (payloads.join_payload)(
+                    &mut node.memo,
+                    &child_node1.bag,
+                    &child_node1.memo,
+                    &child_node2.memo,
+                    additional_data,
+                );
+
+                completed_jobs_tx.send(job_info.nid).unwrap();
+            },
+
+            NiceDTDJob::Terminate => break,
         }
     }
 }

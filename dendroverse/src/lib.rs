@@ -21,10 +21,14 @@ where
     MemoType: Default + Send + Sync,
     AdditionalDataType: Sync,
 {
+
     pub fn solve(&mut self) -> anyhow::Result<()> {
         match &self.solution_algo {
+
             solver::SolutionAlgorithm::UsingNiceDTD(payloads) =>
                 solver::solve_using_nice_dtd(&mut self.dtds, payloads, self.additional_data, self.threads_count),
+
         }
     }
+
 }

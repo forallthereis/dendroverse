@@ -28,7 +28,7 @@ struct DTDNodeConnectivity {
 
 pub(super) struct DTDNode<MemoType> {
     pub bag: Vec<usize>,
-    pub memo: Option<MemoType>,
+    pub memo: MemoType,
 }
 
 
