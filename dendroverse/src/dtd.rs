@@ -5,9 +5,9 @@ use std::sync::{Arc, Mutex};
 
 
 pub(super) struct DirectedTreeDecomposition<MemoType> {
-    root_nid: usize,
-    adj_list: Vec<DTDNodeConnectivity>,
-    nodes: Vec<Arc<Mutex<DTDNode<MemoType>>>>,
+    pub root_nid: usize,
+    pub adj_list: Vec<DTDNodeConnectivity>,
+    pub nodes: Vec<Arc<Mutex<DTDNode<MemoType>>>>,
 }
 
 impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
@@ -19,9 +19,9 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
 
 
 
-struct DTDNodeConnectivity {
-    parent_nid: Option<usize>,
-    children_nids: Vec<usize>,
+pub(super) struct DTDNodeConnectivity {
+    pub parent_nid: Option<usize>,
+    pub children_nids: Vec<usize>,
 }
 
 

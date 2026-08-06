@@ -29,14 +29,14 @@ enum NiceDTDJob<MemoType> {
 
 
 struct NiceTDTLeafJobInfo<MemoType> {
-    nid: usize,
+    fullnid: (usize, usize),
     node: Arc<Mutex<crate::dtd::DTDNode<MemoType>>>,
 }
 
 
 
 struct NiceDTDIntroduceForgetJobInfo<MemoType> {
-    nid: usize,
+    fullnid: (usize, usize),
     node: Arc<Mutex<crate::dtd::DTDNode<MemoType>>>,
     child_node: Arc<Mutex<crate::dtd::DTDNode<MemoType>>>,
     forgotten_vids: Vec<usize>,
@@ -46,7 +46,7 @@ struct NiceDTDIntroduceForgetJobInfo<MemoType> {
 
 
 struct NiceDTDJoinJobInfo<MemoType> {
-    nid: usize,
+    fullnid: (usize, usize),
     node: Arc<Mutex<crate::dtd::DTDNode<MemoType>>>,
     child_node1: Arc<Mutex<crate::dtd::DTDNode<MemoType>>>,
     child_node2: Arc<Mutex<crate::dtd::DTDNode<MemoType>>>,
@@ -75,8 +75,9 @@ where
     let available_jobs_queue_init: VecDeque<NiceDTDJob<MemoType>> =
         dtds
         .iter()
-        .flat_map(|dtd| dtd.iter_leaves())
-        .map(|(nid, node)| NiceDTDJob::Leaf(NiceTDTLeafJobInfo { nid, node }))
+        .enumerate()
+        .flat_map(|(dtdid, dtd)| dtd.iter_leaves().map(move |item| (dtdid, item)))
+        .map(|(dtdid, (nid, node))| NiceDTDJob::Leaf(NiceTDTLeafJobInfo { fullnid: (dtdid, nid), node }))
         .collect();
     let available_jobs = Arc::new(
         AvailableJobs {
@@ -86,7 +87,8 @@ where
     );
 
     // Create communication channels for the reports about completed jobs
-    let (completed_jobs_tx, completed_jobs_rx) = mpsc::sync_channel::<usize>(threads_count);
+    let (completed_jobs_tx, completed_jobs_rx) = mpsc::sync_channel::<(usize, usize)>(threads_count);
+    let mut completed_dtds = 0usize;
 
     // Spawn worker threads
     thread::scope(|s| {
@@ -96,7 +98,78 @@ where
     });
 
     // Track the reports about completed jobs
-    todo!();
+    loop {
+
+        let (dtdid, nid) = completed_jobs_rx.recv()?;
+
+        if nid == unsafe { dtds.get_unchecked(dtdid).root_nid } {
+            completed_dtds += 1;
+            if completed_dtds == dtds.len() {
+                break;
+            }
+            continue;
+        }
+
+        let parent_nid = unsafe { dtds.get_unchecked(dtdid).adj_list.get_unchecked(nid).parent_nid.unwrap() };
+        let parent_children_nids = unsafe { &dtds.get_unchecked(dtdid).adj_list.get_unchecked(parent_nid).children_nids };
+
+        available_jobs.jobs_queue.lock().unwrap().push_back(
+
+            if parent_children_nids.len() == 1 {
+
+                let node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(parent_nid.clone()) ) };
+                let child_node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(nid) ) };
+
+                let forgotten_vids: Vec<usize>;
+                let introduced_vids: Vec<usize>;
+
+                {
+                    let node_bag = &node.lock().unwrap().bag;
+                    let child_bag = &child_node.lock().unwrap().bag;
+
+                    forgotten_vids = node_bag.iter().filter(|vid| !child_bag.contains(vid)).cloned().collect();
+                    introduced_vids = child_bag.iter().filter(|vid| !node_bag.contains(vid)).cloned().collect();
+                }
+
+                NiceDTDJob::IntroduceForget(
+                    NiceDTDIntroduceForgetJobInfo {
+                        fullnid: (dtdid, parent_nid),
+                        node,
+                        child_node,
+                        forgotten_vids,
+                        introduced_vids,
+                    }
+                )
+
+            } else {
+
+                let node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(parent_nid.clone()) ) };
+                let child_node1 = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(parent_children_nids.get_unchecked(0).clone()) ) };
+                let child_node2 = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(parent_children_nids.get_unchecked(1).clone()) ) };
+
+                NiceDTDJob::Join(
+                    NiceDTDJoinJobInfo {
+                        fullnid: (dtdid, parent_nid),
+                        node,
+                        child_node1,
+                        child_node2,
+                    }
+                )
+
+            }
+
+        );
+
+        available_jobs.not_empty_anymore.notify_one();
+
+    }
+
+    // Kill the worker threads
+    for _ in 0..threads_count {
+        available_jobs.jobs_queue.lock().unwrap().push_back(NiceDTDJob::Terminate);
+
+        available_jobs.not_empty_anymore.notify_one();
+    }
 
     Ok(())
 }
@@ -105,7 +178,7 @@ where
 
 fn nice_dtd_worker_thread<MemoType, AdditionalDataType>(
     available_jobs: Arc<AvailableJobs<NiceDTDJob<MemoType>>>,
-    completed_jobs_tx: mpsc::SyncSender<usize>,
+    completed_jobs_tx: mpsc::SyncSender<(usize, usize)>,
     payloads: &NiceDTDPayloads<MemoType, AdditionalDataType>,
     additional_data: &AdditionalDataType,
 )
@@ -130,7 +203,7 @@ where
 
                 (payloads.leaf_payload)(node_memo, node_bag, additional_data);
 
-                completed_jobs_tx.send(job_info.nid).unwrap();
+                completed_jobs_tx.send(job_info.fullnid).unwrap();
             },
 
             NiceDTDJob::IntroduceForget(job_info) => {
@@ -162,7 +235,7 @@ where
                     additional_data,
                 );
 
-                completed_jobs_tx.send(job_info.nid).unwrap();
+                completed_jobs_tx.send(job_info.fullnid).unwrap();
             },
 
             NiceDTDJob::Join(job_info) => {
@@ -178,10 +251,11 @@ where
                     additional_data,
                 );
 
-                completed_jobs_tx.send(job_info.nid).unwrap();
+                completed_jobs_tx.send(job_info.fullnid).unwrap();
             },
 
             NiceDTDJob::Terminate => break,
+
         }
     }
 }
