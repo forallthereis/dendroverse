@@ -1,7 +1,7 @@
 use std::sync::MutexGuard;
 
 mod dtd;
-mod solver;
+mod solve;
 
 
 
@@ -58,7 +58,7 @@ where
     where
         MemoType: NiceDTDMemo<AdditionalDataType>,
     {
-        solver::solve_using_nice_dtd(&mut self.dtds, self.additional_data, self.threads_count)
+        solve::solve_using_nice_dtd(&mut self.dtds, self.additional_data, self.threads_count)
     }
 
 }
