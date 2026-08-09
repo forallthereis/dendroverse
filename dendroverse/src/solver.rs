@@ -4,21 +4,6 @@ use std::{collections::VecDeque, sync::{Arc, Condvar, Mutex, mpsc}, thread};
 
 
 
-pub(super) enum SolutionAlgorithm<MemoType, AdditionalDataType> {
-    UsingNiceDTD(NiceDTDPayloads<MemoType, AdditionalDataType>),
-}
-
-
-
-pub(super) struct NiceDTDPayloads<MemoType, AdditionalDataType> {
-    leaf_payload: fn(&mut MemoType, &Vec<usize>, &AdditionalDataType),
-    introduce_payload: fn(&mut MemoType, &Vec<usize>, &MemoType, &Vec<usize>, &AdditionalDataType),
-    forget_payload: fn(&mut MemoType, &Vec<usize>, &MemoType, &Vec<usize>, &AdditionalDataType),
-    join_payload: fn(&mut MemoType, &Vec<usize>, &MemoType, &MemoType, &AdditionalDataType),
-}
-
-
-
 enum NiceDTDJob<MemoType> {
     Leaf(NiceTDTLeafJobInfo<MemoType>),
     IntroduceForget(NiceDTDIntroduceForgetJobInfo<MemoType>),
@@ -63,12 +48,11 @@ struct AvailableJobs<JobType> {
 
 pub(super) fn solve_using_nice_dtd<MemoType, AdditionalDataType>(
     dtds: &mut Vec<crate::dtd::DirectedTreeDecomposition<MemoType>>,
-    payloads: &NiceDTDPayloads<MemoType, AdditionalDataType>,
     additional_data: &AdditionalDataType,
     threads_count: usize,
 ) -> anyhow::Result<()>
 where
-    MemoType: Default + Send + Sync,
+    MemoType: Default + Send + Sync + crate::NiceDTDMemo<AdditionalDataType>,
     AdditionalDataType: Sync,
 {
     // Populate the initial available jobs queue with the leaves of the tree decompositions
@@ -93,7 +77,7 @@ where
     // Spawn worker threads
     thread::scope(|s| {
         for _ in 0..threads_count {
-            s.spawn(|| { nice_dtd_worker_thread(Arc::clone(&available_jobs), completed_jobs_tx.clone(), payloads, additional_data) });
+            s.spawn(|| { nice_dtd_worker_thread(Arc::clone(&available_jobs), completed_jobs_tx.clone(), additional_data) });
         }
     });
 
@@ -179,13 +163,14 @@ where
 fn nice_dtd_worker_thread<MemoType, AdditionalDataType>(
     available_jobs: Arc<AvailableJobs<NiceDTDJob<MemoType>>>,
     completed_jobs_tx: mpsc::SyncSender<(usize, usize)>,
-    payloads: &NiceDTDPayloads<MemoType, AdditionalDataType>,
     additional_data: &AdditionalDataType,
 )
 where
-    MemoType: Default,
+    MemoType: Default + crate::NiceDTDMemo<AdditionalDataType>,
 {
+
     loop {
+
         let mut available_jobs_queue = available_jobs.jobs_queue.lock().unwrap();
         while available_jobs_queue.is_empty() {
             available_jobs_queue = available_jobs.not_empty_anymore.wait(available_jobs_queue).unwrap();
@@ -201,7 +186,7 @@ where
                 let mut node = job_info.node.lock().unwrap();
                 let crate::dtd::DTDNode::<MemoType> { bag: node_bag, memo: node_memo, .. } = &mut *node;
 
-                (payloads.leaf_payload)(node_memo, node_bag, additional_data);
+                node_memo.leaf_payload(node_bag, additional_data);
 
                 completed_jobs_tx.send(job_info.fullnid).unwrap();
             },
@@ -211,12 +196,11 @@ where
                 let child_node = job_info.child_node.lock().unwrap();
                 let mut intermediate_memo = MemoType::default();
 
-                (payloads.forget_payload)(
-                    &mut intermediate_memo,
+                intermediate_memo.forget_payload(
                     &child_node.bag,
                     &child_node.memo,
                     &job_info.forgotten_vids,
-                    additional_data,
+                    additional_data
                 );
 
                 let intermediate_bag: Vec<usize> =
@@ -227,12 +211,11 @@ where
                     .cloned()
                     .collect();
 
-                (payloads.introduce_payload)(
-                    &mut node.memo,
+                node.memo.introduce_payload(
                     &intermediate_bag,
                     &intermediate_memo,
                     &job_info.introduced_vids,
-                    additional_data,
+                    additional_data
                 );
 
                 completed_jobs_tx.send(job_info.fullnid).unwrap();
@@ -243,12 +226,11 @@ where
                 let child_node1 = job_info.child_node1.lock().unwrap();
                 let child_node2 = job_info.child_node2.lock().unwrap();
 
-                (payloads.join_payload)(
-                    &mut node.memo,
+                node.memo.join_payload(
                     &child_node1.bag,
                     &child_node1.memo,
                     &child_node2.memo,
-                    additional_data,
+                    additional_data
                 );
 
                 completed_jobs_tx.send(job_info.fullnid).unwrap();
@@ -257,5 +239,7 @@ where
             NiceDTDJob::Terminate => break,
 
         }
+
     }
+
 }

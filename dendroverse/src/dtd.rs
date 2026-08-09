@@ -39,6 +39,7 @@ pub(super) struct DTDLeafIter<'a, MemoType> {
 }
 
 impl<'a, MemoType> Iterator for DTDLeafIter<'a, MemoType> {
+
     type Item = (usize, Arc<Mutex<DTDNode<MemoType>>>);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -50,4 +51,5 @@ impl<'a, MemoType> Iterator for DTDLeafIter<'a, MemoType> {
         }
         None
     }
+
 }
