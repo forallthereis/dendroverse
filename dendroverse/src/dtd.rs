@@ -46,7 +46,7 @@ impl<'a, MemoType> Iterator for DTDLeafIter<'a, MemoType> {
         while self.nid < self.dtd.adj_list.len() {
             self.nid += 1;
             if unsafe { self.dtd.adj_list.get_unchecked(self.nid - 1).children_nids.is_empty() } {
-                return Some((self.nid, Arc::clone( unsafe { self.dtd.nodes.get_unchecked(self.nid - 1) } )));
+                return Some((self.nid - 1, Arc::clone( unsafe { self.dtd.nodes.get_unchecked(self.nid - 1) } )));
             }
         }
         None
