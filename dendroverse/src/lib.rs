@@ -1,4 +1,4 @@
-use std::sync::MutexGuard;
+use std::collections::VecDeque;
 
 mod dtd;
 mod solve;
@@ -24,36 +24,19 @@ where
     AdditionalDataType: Sync,
 {
 
+    #[inline]
     pub fn answer(&self) -> Option<MemoType::AnswerType>
     where
-        MemoType: AnswerableMemo,
+        MemoType: BacktrackableMemo,
     {
-
         if self.is_instance_solved {
-
-            let root_nodes: Vec<MutexGuard<dtd::DTDNode<MemoType>>> =
-                self
-                .dtds
-                .iter()
-                .map(|dtd| unsafe { dtd.nodes.get_unchecked(dtd.root_nid).lock().unwrap() })
-                .collect();
-
-            let root_nodes_memos: Vec<&MemoType> =
-                root_nodes
-                .iter()
-                .map(|root_node| &root_node.memo)
-                .collect();
-
-            Some(MemoType::answer(root_nodes_memos))
-
+            backtrack_answer_from_root_nodes(&self.dtds)
         } else {
-
             None
-
         }
-
     }
 
+    #[inline(always)]
     pub fn solve_using_nice_dtd(&mut self) -> anyhow::Result<()>
     where
         MemoType: NiceDTDMemo<AdditionalDataType>,
@@ -101,10 +84,57 @@ pub trait NiceDTDMemo<AdditionalDataType> {
 
 
 
-pub trait AnswerableMemo {
+pub trait BacktrackableMemo {
 
     type AnswerType;
+    type BacktrackingHint;
+    type PartialAnswerType: Default + TryInto<Self::AnswerType>;
 
-    fn answer(root_nodes_memos: Vec<&Self>) -> Self::AnswerType;
+    fn extend_partial_solution(
+        &self,
+        partial_solution: Option<Self::PartialAnswerType>,
+        hint: Option<Self::BacktrackingHint>,
+        children_nids: &Vec<usize>
+    ) -> (Option<Self::PartialAnswerType>, Vec<Option<Self::BacktrackingHint>>);
+
+}
+
+
+
+fn backtrack_answer_from_root_nodes<MemoType>(dtds: &Vec<dtd::DirectedTreeDecomposition<MemoType>>) -> Option<MemoType::AnswerType>
+where
+    MemoType: BacktrackableMemo,
+{
+
+    let mut partial_solution = Some(MemoType::PartialAnswerType::default());
+
+    for dtd in dtds.iter() {
+
+        let mut node_queue: VecDeque<(usize, Option<MemoType::BacktrackingHint>)> = VecDeque::from([(dtd.root_nid, None)]);
+
+        while !node_queue.is_empty() {
+
+            let (nid, hint) = node_queue.pop_front().unwrap();
+            let memo = unsafe{ &dtd.nodes.get_unchecked(nid).lock().unwrap().memo };
+            let children_nids = unsafe { &dtd.adj_list.get_unchecked(nid).children_nids };
+            let children_hints;
+
+            (partial_solution, children_hints) = memo.extend_partial_solution(
+                partial_solution,
+                hint,
+                children_nids,
+            );
+
+            if partial_solution.is_none() {
+                return None;
+            }
+
+            node_queue.extend(children_nids.iter().cloned().zip(children_hints.into_iter()));
+
+        }
+
+    }
+
+    partial_solution.unwrap().try_into().ok()
 
 }
