@@ -84,42 +84,6 @@ where
 
 
 
-pub trait NiceDTDMemo<AdditionalDataType> {
-
-    fn leaf_payload(
-        &mut self,
-        bag: &Vec<usize>,
-        additional_data: &AdditionalDataType,
-    );
-
-    fn introduce_payload(
-        &mut self,
-        child_bag: &Vec<usize>,
-        child_memo: &Self,
-        introduced_vids: &Vec<usize>,
-        additional_data: &AdditionalDataType,
-    );
-
-    fn forget_payload(
-        &mut self,
-        child_bag: &Vec<usize>,
-        child_memo: &Self,
-        forgotten_vids: &Vec<usize>,
-        additional_data: &AdditionalDataType,
-    );
-
-    fn join_payload(
-        &mut self,
-        children_bag: &Vec<usize>,
-        child1_memo: &Self,
-        child2_memo: &Self,
-        additional_data: &AdditionalDataType,
-    );
-
-}
-
-
-
 pub trait BacktrackableMemo {
 
     type AnswerType;
