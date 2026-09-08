@@ -12,6 +12,7 @@ pub(super) struct DirectedTreeDecomposition<MemoType> {
 
 impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
 
+    // Adds a new node to a directed tree decomposition and returns its node ID
     fn add_node(&'a mut self, parent_nid: Option<usize>, bag: Vec<usize>, memo: MemoType) -> usize {
 
         self.adj_list.push(DTDNodeConnectivity { parent_nid, children_nids: Vec::new() });
@@ -33,11 +34,13 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
 
     }
 
+    // Returns a borrowing iterator that iterates over all leaves in the directed tree decomposition
     #[inline(always)]
     pub(super) fn iter_leaves(&'a self) -> DTDLeafIter<'a, MemoType> {
         DTDLeafIter { dtd: self, nid: 0 }
     }
 
+    // Builds a new nice directed tree decompostion from the given Arboretum_TD tree decomposition
     pub(super) fn nice_dtd_from(td: arboretum_td::tree_decomposition::TreeDecomposition) -> Self
     where
         MemoType: Default,
@@ -45,8 +48,11 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
 
         let mut answer = DirectedTreeDecomposition { root_nid: 0, adj_list: Vec::new(), nodes: Vec::new() };
 
+        // Assign the central node of the given tree decomposition to be the root
+        // This is a ~heuristic~ that, as we hope, leads to the balanced branches of the nice tree decomposition
         let td_root = arboretum_td_centre(&td);
 
+        // Add the root
         answer.add_node(
             None,
             unsafe { td.bags.get_unchecked(td_root) }.vertex_set.iter().copied().collect(),
@@ -59,7 +65,7 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
                 .iter()
                 .map(|nid| (*nid, td_root))
         );
-        let mut td_child_id;
+        let mut td_child_nid;
         let mut td_parent_nid;
         let mut td_grandparent_nid;
         let mut dtd_child_nid;
@@ -81,19 +87,19 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
 
             while !unmapped_td_children_nids.is_empty() {
 
-                td_child_id = unmapped_td_children_nids.pop_front().unwrap();
+                td_child_nid = unmapped_td_children_nids.pop_front().unwrap();
 
                 // If there're no other td-children, add an introduce-forget node for the current td-child
                 if unmapped_td_children_nids.is_empty() {
 
                     dtd_child_nid = answer.add_node(
                         Some(dtd_parent_nid),
-                        unsafe { td.bags.get_unchecked(td_child_id) }.vertex_set.iter().copied().collect(),
+                        unsafe { td.bags.get_unchecked(td_child_nid) }.vertex_set.iter().copied().collect(),
                         MemoType::default(),
                     );
-                    unsafe { *nid_map.get_unchecked_mut(td_child_id) = dtd_child_nid; }
+                    unsafe { *nid_map.get_unchecked_mut(td_child_nid) = dtd_child_nid; }
 
-                    unexplored_td_parent_nids.push_back((td_child_id, td_parent_nid));
+                    unexplored_td_parent_nids.push_back((td_child_nid, td_parent_nid));
 
                 // Otherwise, make the current dtd-parent a join node with an introduce-forget node for the current td-child
                 } else {
@@ -112,10 +118,10 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
                     );
                     dtd_child_nid = answer.add_node(
                         Some(dtd_join_branch1_nid),
-                        unsafe { td.bags.get_unchecked(td_child_id) }.vertex_set.iter().copied().collect(),
+                        unsafe { td.bags.get_unchecked(td_child_nid) }.vertex_set.iter().copied().collect(),
                         MemoType::default(),
                     );
-                    unsafe { *nid_map.get_unchecked_mut(td_child_id) = dtd_child_nid; }
+                    unsafe { *nid_map.get_unchecked_mut(td_child_nid) = dtd_child_nid; }
 
                     dtd_parent_nid = dtd_join_branch2_nid;
 
