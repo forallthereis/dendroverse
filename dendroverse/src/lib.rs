@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 
+use arboretum_td::{graph::MutableGraph, solver::AtomSolver};
+
 mod dtd;
 mod solve;
 
@@ -34,6 +36,40 @@ where
         } else {
             None
         }
+    }
+
+    pub fn with_auto_generated_nice_dtd<OgGraphType>(
+        og_graph: &'a OgGraphType,
+        additional_data: &'a AdditionalDataType,
+        threads_count: usize,
+    ) -> Self
+    where
+        OgGraphType: DendroverseOgGraphInterface,
+        MemoType: Default + NiceDTDMemo<AdditionalDataType>,
+    {
+
+        let mut og_graph_arboretum = arboretum_td::graph::HashMapGraph::with_capacity(og_graph.vertices_count());
+        for vid in 0..og_graph.vertices_count() {
+            og_graph_arboretum.add_vertex(vid);
+        }
+        for (vid1, vid2) in og_graph.iter_edges() {
+            og_graph_arboretum.add_edge(vid1, vid2);
+        }
+
+        let mut dtds = Vec::new();
+        for cc_vids in og_graph_arboretum.connected_components() {
+            let cc = og_graph_arboretum.vertex_induced_subgraph(&cc_vids);
+            let cc_td_generator = arboretum_td::exact::TamakiPid::with_graph(&cc);
+            dtds.push(
+                match cc_td_generator.compute() {
+                    arboretum_td::solver::ComputationResult::Bounds(_) => todo!(),
+                    arboretum_td::solver::ComputationResult::ComputedTreeDecomposition(td) => dtd::DirectedTreeDecomposition::nice_dtd_from(td),
+                }
+            );
+        }
+
+        DendroverseInstance { dtds, additional_data, threads_count, is_instance_solved: false }
+
     }
 
     #[inline(always)]
@@ -136,5 +172,48 @@ where
     }
 
     partial_solution.unwrap().try_into().ok()
+
+}
+
+
+
+pub trait DendroverseOgGraphInterface {
+    fn vertices_count(&self) -> usize;
+    fn iter_edges(&self) -> impl Iterator<Item = (usize, usize)>;
+}
+
+
+
+pub trait NiceDTDMemo<AdditionalDataType> {
+
+    fn leaf_payload(
+        &mut self,
+        bag: &Vec<usize>,
+        additional_data: &AdditionalDataType,
+    );
+
+    fn introduce_payload(
+        &mut self,
+        child_bag: &Vec<usize>,
+        child_memo: &Self,
+        introduced_vids: &Vec<usize>,
+        additional_data: &AdditionalDataType,
+    );
+
+    fn forget_payload(
+        &mut self,
+        child_bag: &Vec<usize>,
+        child_memo: &Self,
+        forgotten_vids: &Vec<usize>,
+        additional_data: &AdditionalDataType,
+    );
+
+    fn join_payload(
+        &mut self,
+        children_bag: &Vec<usize>,
+        child1_memo: &Self,
+        child2_memo: &Self,
+        additional_data: &AdditionalDataType,
+    );
 
 }
