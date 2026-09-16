@@ -6,7 +6,7 @@ use std::{collections::VecDeque, sync::{Arc, Condvar, Mutex, mpsc}, thread};
 
 enum NiceDTDJob<MemoType> {
     Leaf(NiceTDTLeafJobInfo<MemoType>),
-    IntroduceForget(NiceDTDIntroduceForgetJobInfo<MemoType>),
+    ForgetIntroduce(NiceDTDIntroduceForgetJobInfo<MemoType>),
     Join(NiceDTDJoinJobInfo<MemoType>),
     Terminate,
 }
@@ -75,87 +75,99 @@ where
     let mut completed_dtds = 0usize;
 
     // Spawn worker threads
-    thread::scope(|s| {
+    thread::scope(|s| -> anyhow::Result<()> {
+
         for _ in 0..threads_count {
             s.spawn(|| { nice_dtd_worker_thread(Arc::clone(&available_jobs), completed_jobs_tx.clone(), additional_data) });
         }
-    });
 
-    // Track the reports about completed jobs
-    loop {
+        // Track the reports about completed jobs
+        loop {
 
-        let (dtdid, nid) = completed_jobs_rx.recv()?;
+            let (dtdid, nid) = completed_jobs_rx.recv()?;
 
-        if nid == unsafe { dtds.get_unchecked(dtdid).root_nid } {
-            completed_dtds += 1;
-            if completed_dtds == dtds.len() {
-                break;
+            if nid == unsafe { dtds.get_unchecked(dtdid).root_nid } {
+                completed_dtds += 1;
+                if completed_dtds == dtds.len() {
+                    break;
+                }
+                continue;
             }
-            continue;
-        }
 
-        let parent_nid = unsafe { dtds.get_unchecked(dtdid).adj_list.get_unchecked(nid).parent_nid.unwrap() };
-        let parent_children_nids = unsafe { &dtds.get_unchecked(dtdid).adj_list.get_unchecked(parent_nid).children_nids };
+            let parent_nid = unsafe { dtds.get_unchecked(dtdid).adj_list.get_unchecked(nid).parent_nid.unwrap() };
+            let parent_children_nids = unsafe { &dtds.get_unchecked(dtdid).adj_list.get_unchecked(parent_nid).children_nids };
 
-        available_jobs.jobs_queue.lock().unwrap().push_back(
+            available_jobs
+                .jobs_queue
+                .lock()
+                .map_err(|_| anyhow::anyhow!("Orchestrator failed to send new jobs to the worker threads because one of the worker threads had panicked and deadlocked the shared jobs queue."))?
+                .push_back(
 
-            if parent_children_nids.len() == 1 {
+                if parent_children_nids.len() == 1 {
 
-                let node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(parent_nid.clone()) ) };
-                let child_node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(nid) ) };
+                    let node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(parent_nid.clone()) ) };
+                    let child_node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(nid) ) };
 
-                let forgotten_vids: Vec<usize>;
-                let introduced_vids: Vec<usize>;
+                    let forgotten_vids: Vec<usize>;
+                    let introduced_vids: Vec<usize>;
 
-                {
-                    let node_bag = &node.lock().unwrap().bag;
-                    let child_bag = &child_node.lock().unwrap().bag;
+                    {
+                        const ERROR_MESSAGE: &str = "Orchestrator failed to read the bag of a nice tree decomposition node because one of the worker threads had panicked and deadlocked the node.";
+                        let node_bag = &node.lock().map_err(|_| anyhow::anyhow!(ERROR_MESSAGE))?.bag;
+                        let child_bag = &child_node.lock().map_err(|_| anyhow::anyhow!(ERROR_MESSAGE))?.bag;
 
-                    forgotten_vids = node_bag.iter().filter(|vid| !child_bag.contains(vid)).cloned().collect();
-                    introduced_vids = child_bag.iter().filter(|vid| !node_bag.contains(vid)).cloned().collect();
+                        forgotten_vids = child_bag.iter().filter(|vid| !node_bag.contains(vid)).cloned().collect();
+                        introduced_vids = node_bag.iter().filter(|vid| !child_bag.contains(vid)).cloned().collect();
+                    }
+
+                    NiceDTDJob::ForgetIntroduce(
+                        NiceDTDIntroduceForgetJobInfo {
+                            fullnid: (dtdid, parent_nid),
+                            node,
+                            child_node,
+                            forgotten_vids,
+                            introduced_vids,
+                        }
+                    )
+
+                } else {
+
+                    let node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(parent_nid.clone()) ) };
+                    let child_node1 = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(parent_children_nids.get_unchecked(0).clone()) ) };
+                    let child_node2 = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(parent_children_nids.get_unchecked(1).clone()) ) };
+
+                    NiceDTDJob::Join(
+                        NiceDTDJoinJobInfo {
+                            fullnid: (dtdid, parent_nid),
+                            node,
+                            child_node1,
+                            child_node2,
+                        }
+                    )
+
                 }
 
-                NiceDTDJob::IntroduceForget(
-                    NiceDTDIntroduceForgetJobInfo {
-                        fullnid: (dtdid, parent_nid),
-                        node,
-                        child_node,
-                        forgotten_vids,
-                        introduced_vids,
-                    }
-                )
+            );
 
-            } else {
+            available_jobs.not_empty_anymore.notify_one();
 
-                let node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(parent_nid.clone()) ) };
-                let child_node1 = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(parent_children_nids.get_unchecked(0).clone()) ) };
-                let child_node2 = unsafe { Arc::clone( &dtds.get_unchecked(dtdid.clone()).nodes.get_unchecked(parent_children_nids.get_unchecked(1).clone()) ) };
+        }
 
-                NiceDTDJob::Join(
-                    NiceDTDJoinJobInfo {
-                        fullnid: (dtdid, parent_nid),
-                        node,
-                        child_node1,
-                        child_node2,
-                    }
-                )
+        // Kill the worker threads
+        for _ in 0..threads_count {
+            available_jobs
+                .jobs_queue
+                .lock()
+                .map_err(|_| anyhow::anyhow!("Orchestrator failed to terminate the worker threads because one of the worker threads had panicked and deadlocked the shared jobs queue."))?
+                .push_back(NiceDTDJob::Terminate);
 
-            }
+            available_jobs.not_empty_anymore.notify_one();
+        }
 
-        );
+        Ok(())
 
-        available_jobs.not_empty_anymore.notify_one();
+    })
 
-    }
-
-    // Kill the worker threads
-    for _ in 0..threads_count {
-        available_jobs.jobs_queue.lock().unwrap().push_back(NiceDTDJob::Terminate);
-
-        available_jobs.not_empty_anymore.notify_one();
-    }
-
-    Ok(())
 }
 
 
@@ -172,6 +184,7 @@ where
     loop {
 
         let mut available_jobs_queue = available_jobs.jobs_queue.lock().unwrap();
+
         while available_jobs_queue.is_empty() {
             available_jobs_queue = available_jobs.not_empty_anymore.wait(available_jobs_queue).unwrap();
         }
@@ -191,31 +204,17 @@ where
                 completed_jobs_tx.send(job_info.fullnid).unwrap();
             },
 
-            NiceDTDJob::IntroduceForget(job_info) => {
+            NiceDTDJob::ForgetIntroduce(job_info) => {
                 let mut node = job_info.node.lock().unwrap();
                 let child_node = job_info.child_node.lock().unwrap();
-                let mut intermediate_memo = MemoType::default();
 
-                intermediate_memo.forget_payload(
+                node.memo.forget_introduce_payload(
                     &child_node.bag,
+                    job_info.fullnid.1,
                     &child_node.memo,
                     &job_info.forgotten_vids,
-                    additional_data
-                );
-
-                let intermediate_bag: Vec<usize> =
-                    child_node
-                    .bag
-                    .iter()
-                    .filter(|vid| !job_info.forgotten_vids.contains(vid))
-                    .cloned()
-                    .collect();
-
-                node.memo.introduce_payload(
-                    &intermediate_bag,
-                    &intermediate_memo,
                     &job_info.introduced_vids,
-                    additional_data
+                    additional_data,
                 );
 
                 completed_jobs_tx.send(job_info.fullnid).unwrap();
@@ -228,7 +227,9 @@ where
 
                 node.memo.join_payload(
                     &child_node1.bag,
+                    job_info.fullnid.1,
                     &child_node1.memo,
+                    job_info.fullnid.1,
                     &child_node2.memo,
                     additional_data
                 );

@@ -3,6 +3,11 @@ name = "dendroverse"
 version = "0.1.0"
 edition = "2024"
 
+[dev-dependencies]
+petgraph = "0.8.3"
+
 [dependencies]
 anyhow = "1.0.104"
 arboretum-td = "0.1.0"
+fxhash = "0.2.1"
+itertools = "0.15.0"

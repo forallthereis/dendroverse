@@ -42,7 +42,7 @@ where
         og_graph: &'a OgGraphType,
         additional_data: &'a AdditionalDataType,
         threads_count: usize,
-    ) -> Self
+    ) -> anyhow::Result<Self>
     where
         OgGraphType: DendroverseOgGraphInterface,
         MemoType: Default + NiceDTDMemo<AdditionalDataType>,
@@ -62,13 +62,13 @@ where
             let cc_td_generator = arboretum_td::exact::TamakiPid::with_graph(&cc);
             dtds.push(
                 match cc_td_generator.compute() {
-                    arboretum_td::solver::ComputationResult::Bounds(_) => todo!(),
+                    arboretum_td::solver::ComputationResult::Bounds(_) => return Err(anyhow::anyhow!("The automatic generation of the nice tree decomposition failed.")),
                     arboretum_td::solver::ComputationResult::ComputedTreeDecomposition(td) => dtd::DirectedTreeDecomposition::nice_dtd_from(td),
                 }
             );
         }
 
-        DendroverseInstance { dtds, additional_data, threads_count, is_instance_solved: false }
+        Ok(DendroverseInstance { dtds, additional_data, threads_count, is_instance_solved: false })
 
     }
 
@@ -77,7 +77,9 @@ where
     where
         MemoType: NiceDTDMemo<AdditionalDataType>,
     {
-        solve::solve_using_nice_dtd(&mut self.dtds, self.additional_data, self.threads_count)
+        let result = solve::solve_using_nice_dtd(&mut self.dtds, self.additional_data, self.threads_count);
+        self.is_instance_solved = true;
+        result
     }
 
 }
@@ -92,6 +94,7 @@ pub trait BacktrackableMemo {
 
     fn extend_partial_solution(
         &self,
+        nid: usize,
         partial_solution: Option<Self::PartialAnswerType>,
         hint: Option<Self::BacktrackingHint>,
         children_nids: &Vec<usize>
@@ -120,6 +123,7 @@ where
             let children_hints;
 
             (partial_solution, children_hints) = memo.extend_partial_solution(
+                nid,
                 partial_solution,
                 hint,
                 children_nids,
@@ -156,26 +160,22 @@ pub trait NiceDTDMemo<AdditionalDataType> {
         additional_data: &AdditionalDataType,
     );
 
-    fn introduce_payload(
+    fn forget_introduce_payload(
         &mut self,
         child_bag: &Vec<usize>,
-        child_memo: &Self,
-        introduced_vids: &Vec<usize>,
-        additional_data: &AdditionalDataType,
-    );
-
-    fn forget_payload(
-        &mut self,
-        child_bag: &Vec<usize>,
+        child_nid: usize,
         child_memo: &Self,
         forgotten_vids: &Vec<usize>,
+        introduced_vids: &Vec<usize>,
         additional_data: &AdditionalDataType,
     );
 
     fn join_payload(
         &mut self,
         children_bag: &Vec<usize>,
+        child1_nid: usize,
         child1_memo: &Self,
+        child2_nid: usize,
         child2_memo: &Self,
         additional_data: &AdditionalDataType,
     );

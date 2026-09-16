@@ -1,5 +1,7 @@
 use std::{collections::{HashSet, VecDeque}, sync::{Arc, Mutex}};
 
+use itertools::Itertools;
+
 
 
 
@@ -55,16 +57,11 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
         // Add the root
         answer.add_node(
             None,
-            unsafe { td.bags.get_unchecked(td_root) }.vertex_set.iter().copied().collect(),
-            MemoType::default()
+            unsafe { td.bags.get_unchecked(td_root) }.vertex_set.iter().cloned().sorted().collect(),
+            MemoType::default(),
         );
 
-        let mut unexplored_td_parent_nids = VecDeque::from_iter(
-            unsafe { td.bags.get_unchecked(td_root) }
-                .neighbors
-                .iter()
-                .map(|nid| (*nid, td_root))
-        );
+        let mut unexplored_td_parent_nids = VecDeque::from([(td_root, td_root)]);
         let mut unmapped_td_children_nids = VecDeque::new();
         let mut nid_map = vec![0; td.bags.len()];
 
@@ -84,22 +81,23 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
 
                 let td_child_nid = unmapped_td_children_nids.pop_front().unwrap();
 
-                // If there're no other td-children, add an introduce-forget node for the current td-child
+                // If there're no other td-children, add an forget-introduce node for the current td-child
                 if unmapped_td_children_nids.is_empty() {
 
                     let dtd_child_nid = answer.add_node(
                         Some(dtd_parent_nid),
-                        unsafe { td.bags.get_unchecked(td_child_nid) }.vertex_set.iter().copied().collect(),
+                        unsafe { td.bags.get_unchecked(td_child_nid) }.vertex_set.iter().cloned().sorted().collect(),
                         MemoType::default(),
                     );
                     unsafe { *nid_map.get_unchecked_mut(td_child_nid) = dtd_child_nid; }
 
                     unexplored_td_parent_nids.push_back((td_child_nid, td_parent_nid));
 
-                // Otherwise, make the current dtd-parent a join node with an introduce-forget node for the current td-child
+                // Otherwise, make the current dtd-parent a join node with an forget-introduce node for the current td-child
                 } else {
 
                     let dtd_parent_bag = unsafe { answer.nodes.get_unchecked(dtd_parent_nid) }.lock().unwrap().bag.clone();
+                    println!("Cloned parent bag for a new join node: {:?}", dtd_parent_bag);
 
                     let dtd_join_branch1_nid = answer.add_node(
                         Some(dtd_parent_nid),
@@ -113,10 +111,12 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
                     );
                     let dtd_child_nid = answer.add_node(
                         Some(dtd_join_branch1_nid),
-                        unsafe { td.bags.get_unchecked(td_child_nid) }.vertex_set.iter().copied().collect(),
+                        unsafe { td.bags.get_unchecked(td_child_nid) }.vertex_set.iter().cloned().sorted().collect(),
                         MemoType::default(),
                     );
                     unsafe { *nid_map.get_unchecked_mut(td_child_nid) = dtd_child_nid; }
+
+                    unexplored_td_parent_nids.push_back((td_child_nid, td_parent_nid));
 
                     dtd_parent_nid = dtd_join_branch2_nid;
 
