@@ -97,7 +97,6 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
                 } else {
 
                     let dtd_parent_bag = unsafe { answer.nodes.get_unchecked(dtd_parent_nid) }.lock().unwrap().bag.clone();
-                    println!("Cloned parent bag for a new join node: {:?}", dtd_parent_bag);
 
                     let dtd_join_branch1_nid = answer.add_node(
                         Some(dtd_parent_nid),

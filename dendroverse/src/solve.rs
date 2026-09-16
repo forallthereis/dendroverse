@@ -1,5 +1,7 @@
 use std::{collections::VecDeque, sync::{Arc, Condvar, Mutex, mpsc}, thread};
 
+use fxhash::{FxBuildHasher, FxHashSet};
+
 
 
 
@@ -70,6 +72,10 @@ where
         }
     );
 
+    // Create a tracker of join nodes at least one child of which was processed
+    // Join nodes can only be processed once both their children are processed
+    let mut one_child_processed_join_nids = FxHashSet::with_hasher(FxBuildHasher::new());
+
     // Create communication channels for the reports about completed jobs
     let (completed_jobs_tx, completed_jobs_rx) = mpsc::sync_channel::<(usize, usize)>(threads_count);
     let mut completed_dtds = 0usize;
@@ -96,6 +102,11 @@ where
 
             let parent_nid = unsafe { dtds.get_unchecked(dtdid).adj_list.get_unchecked(nid).parent_nid.unwrap() };
             let parent_children_nids = unsafe { &dtds.get_unchecked(dtdid).adj_list.get_unchecked(parent_nid).children_nids };
+
+            if parent_children_nids.len() == 2 && !one_child_processed_join_nids.contains(&parent_nid) {
+                one_child_processed_join_nids.insert(parent_nid);
+                continue;
+            }
 
             available_jobs
                 .jobs_queue
