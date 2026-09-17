@@ -132,85 +132,6 @@ impl dendroverse::NiceDTDMemo<MyGraph> for MaxIndependentSetMemo {
 
     }
 
-    // fn introduce_payload(
-    //     &mut self,
-    //     _child_bag: &Vec<usize>,
-    //     child_memo: &Self,
-    //     introduced_vids: &Vec<usize>,
-    //     additional_data: &MyGraph,
-    // )
-    // {
-
-    //     self.reserve(child_memo.len() * (1 << introduced_vids.len()));
-
-    //     for new_vids in introduced_vids.into_iter().powerset() {
-
-    //         for (child_entry_id, child_entry) in child_memo.iter().enumerate() {
-
-    //             if is_independent_with_added(&child_entry.vertex_set, &new_vids, additional_data) {
-
-    //                 let parent_vertex_set =
-    //                     child_entry
-    //                         .vertex_set
-    //                         .iter()
-    //                         .cloned()
-    //                         .merge(new_vids.clone().into_iter().cloned())
-    //                         .collect();
-
-    //                 self.push(
-    //                     MaxIndependentSetMemoEntry {
-    //                         vertex_set: parent_vertex_set,
-    //                         obj_value: child_entry.obj_value + new_vids.len(),
-    //                         ancestor_entry_id: SingleAncestor(child_entry_id),
-    //                     }
-    //                 );
-
-    //             }
-
-    //         }
-
-    //     }
-
-    //     self.shrink_to_fit();
-
-    // }
-
-    // fn forget_payload(
-    //     &mut self,
-    //     _child_bag: &Vec<usize>,
-    //     child_memo: &Self,
-    //     forgotten_vids: &Vec<usize>,
-    //     _additional_data: &MyGraph,
-    // )
-    // {
-
-    //     let mut parent_memo_entries_collector =
-    //         FxHashMap
-    //             ::<Vec<usize>, (usize, usize)>
-    //             ::with_capacity_and_hasher(child_memo.len(), FxBuildHasher::new());
-
-    //     for (child_entry_id, child_entry) in child_memo.iter().enumerate() {
-
-    //         let parent_vertex_set = subtract_sorted_vecs(&child_entry.vertex_set, forgotten_vids);
-
-    //         match parent_memo_entries_collector.get(&parent_vertex_set) {
-    //             Some((obj_value, _)) =>
-    //                 if child_entry.obj_value > *obj_value {
-    //                     parent_memo_entries_collector.insert(parent_vertex_set, (child_entry.obj_value, child_entry_id));
-    //                 },
-    //             None => {parent_memo_entries_collector.insert(parent_vertex_set, (child_entry.obj_value, child_entry_id));},
-    //         }
-
-    //     }
-
-    //     *self =
-    //         parent_memo_entries_collector
-    //             .into_iter()
-    //             .map(|(vertex_set, (obj_value, child_entry_id))| MaxIndependentSetMemoEntry { vertex_set, obj_value, ancestor_entry_id: SingleAncestor(child_entry_id) })
-    //             .collect();
-
-    // }
-
     fn join_payload(
         &mut self,
         _children_bag: &Vec<usize>,
@@ -392,7 +313,32 @@ fn subtract_sorted_vecs(minuend: &Vec<usize>, subtrahend: &Vec<usize>) -> Vec<us
 
 
 #[test]
-fn main() {
+fn disconnected_graph() {
+
+    let og_graph = Graph::<(), (), Undirected, usize>::from_edges([
+        (0, 1),
+        (2, 3),
+    ]);
+    let og_graph = MyGraph(og_graph);
+
+    let mut max_independent_set_solver =
+        dendroverse
+            ::DendroverseInstance
+            ::<MaxIndependentSetMemo, _>
+            ::with_auto_generated_nice_dtd(&og_graph, &og_graph)
+            .unwrap();
+
+    max_independent_set_solver.solve_using_nice_dtd(15).unwrap();
+
+    let answer = max_independent_set_solver.answer().unwrap();
+
+    assert_eq!(answer.len(), 2);
+    println!("Optimal solution: {:?}", answer);
+
+}
+
+#[test]
+fn wikipedia_graph() {
 
     let og_graph = Graph::<(), (), Undirected, usize>::from_edges([
         (0, 2),
@@ -417,10 +363,10 @@ fn main() {
         dendroverse
             ::DendroverseInstance
             ::<MaxIndependentSetMemo, _>
-            ::with_auto_generated_nice_dtd(&og_graph, &og_graph, 15)
+            ::with_auto_generated_nice_dtd(&og_graph, &og_graph)
             .unwrap();
 
-    max_independent_set_solver.solve_using_nice_dtd().unwrap();
+    max_independent_set_solver.solve_using_nice_dtd(15).unwrap();
 
     let answer = max_independent_set_solver.answer().unwrap();
 
