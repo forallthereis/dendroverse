@@ -321,19 +321,24 @@ fn disconnected_graph() {
     ]);
     let og_graph = MyGraph(og_graph);
 
-    let mut max_independent_set_solver =
+    let mut max_independent_set_instance =
         dendroverse
             ::DendroverseInstance
             ::<MaxIndependentSetMemo, _>
             ::with_auto_generated_nice_dtd(&og_graph, &og_graph)
             .unwrap();
 
-    max_independent_set_solver.solve_using_nice_dtd(15).unwrap();
-
-    let answer = max_independent_set_solver.answer().unwrap();
-
+    max_independent_set_instance.solve_using_nice_dtd(15).unwrap();
+    let answer = max_independent_set_instance.answer().unwrap();
     assert_eq!(answer.len(), 2);
-    println!("Optimal solution: {:?}", answer);
+    println!("Optimal solution (concurrent): {:?}", answer);
+
+    max_independent_set_instance.reset();
+
+    max_independent_set_instance.solve_using_nice_dtd(1).unwrap();
+    let answer = max_independent_set_instance.answer().unwrap();
+    assert_eq!(answer.len(), 2);
+    println!("Optimal solution (sequential): {:?}", answer);
 
 }
 
@@ -359,18 +364,23 @@ fn wikipedia_graph() {
     ]);
     let og_graph = MyGraph(og_graph);
 
-    let mut max_independent_set_solver =
+    let mut max_independent_set_instance =
         dendroverse
             ::DendroverseInstance
             ::<MaxIndependentSetMemo, _>
             ::with_auto_generated_nice_dtd(&og_graph, &og_graph)
             .unwrap();
 
-    max_independent_set_solver.solve_using_nice_dtd(15).unwrap();
-
-    let answer = max_independent_set_solver.answer().unwrap();
-
+    max_independent_set_instance.solve_using_nice_dtd(15).unwrap();
+    let answer = max_independent_set_instance.answer().unwrap();
     assert_eq!(answer.len(), 6);
-    println!("Optimal solution: {:?}", answer);
+    println!("Optimal solution (concurrent): {:?}", answer);
+
+    max_independent_set_instance.reset();
+
+    max_independent_set_instance.solve_using_nice_dtd(1).unwrap();
+    let answer = max_independent_set_instance.answer().unwrap();
+    assert_eq!(answer.len(), 6);
+    println!("Optimal solution (sequential): {:?}", answer);
 
 }

@@ -11,7 +11,7 @@
 //! ## ✅ What this crate does for you
 //! * Generates optimal tree decompsitions (using [`arboretum_td`][arboretum] under the hood).
 //! * Transforms tree decompositions into nice tree decompositions.
-//! * Implements a **multi-threaded** dynamic-programming-based solution process, including the orchestration of jobs for multiple threads.
+//! * Implements a **multi-threaded**, dynamic programming-based solution process that includes job orchestration for multiple threads.
 //! * Constructs an explicit solution using backtracking.
 //!
 //! ## ❎ What this crate doesn't do for you
@@ -113,7 +113,7 @@ mod solve;
 /// [answer]: DendroverseInstance::answer
 pub struct DendroverseInstance<'a, MemoType, AdditionalDataType>
 where
-    MemoType: Default + Send + Sync,
+    MemoType: Send + Sync,
     AdditionalDataType: Sync,
 {
     dtds: Vec<dtd::DirectedTreeDecomposition<MemoType>>,
@@ -123,13 +123,13 @@ where
 
 impl<'a, MemoType, AdditionalDataType> DendroverseInstance<'a, MemoType, AdditionalDataType>
 where
-    MemoType: Default + Send + Sync,
+    MemoType: Send + Sync,
     AdditionalDataType: Sync,
 {
 
-    /// Retrieves an answer to the solved problem
+    /// Retrieves an answer to the solved problem.
     ///
-    /// Returns `Some(answer)` if the `DendroverseInstance` is solved and the instance is feasible, `None` otherwise.
+    /// Returns `Some(answer)` if the `DendroverseInstance` is solved and a solution exists, `None` otherwise.
     #[inline]
     pub fn answer(&self) -> Option<MemoType::AnswerType>
     where
@@ -152,9 +152,11 @@ where
     /// the newly constructed partial solutions.
     ///
     /// Note that a separate nice tree decomposition will be generated for each connected component of `og_graph`.
-    /// If multi-thread dynamic programming is used, the nodes from all the tree decompositions will be processed concurrently.
-    /// If single-thread dynamic programming is used, the decompositions will be processed sequentially.
-    /// During backtracking, the nice tree decompositions are always processed one after another in a single thread.
+    /// If multi-threaded dynamic programming is later used to solve the instance, the nodes from all the tree decompositions will be processed concurrently.
+    /// If single-threaded dynamic programming is used instead, the nice tree decompositions will be processed sequentially, in a single thread.
+    /// During backtracking, the nice tree decompositions will always be processed sequentially, in a single thread.
+    ///
+    /// This function returns an error if the automatic generation of a nice tree decomposition fails.
     pub fn with_auto_generated_nice_dtd<OgGraphType>(
         og_graph: &'a OgGraphType,
         additional_data: &'a AdditionalDataType,
@@ -202,19 +204,71 @@ where
 
     }
 
-    /// Solves a `DendroverseInstance` using dynamic programming over nice tree decompositions
+    /// Solves the`DendroverseInstance` using dynamic programming over nice tree decompositions.
     ///
     /// Here, `threads_count` is the number of worker threads that will be spawned to execute the dynamic-programming-based solution process.
-    /// We recommend setting this argument to the number of logical cores available in your system minus one.
-    /// Setting this argument to `0` or `1` will result in a single-thread dynamic programming.
-    #[inline(always)]
+    /// For large instances, we recommend setting this argument to the number of available logical cores in your system minus one.
+    /// Setting this argument to `0` or `1` will result in a single-threaded dynamic programming.
+    ///
+    /// This function will return an error if one occurs while solving the instance.
+    ///
+    /// Calling this function after the instance was already solved will do nothing.
+    /// If you want to solve the problem again using a different method or number of threads, consider resetting the instance with
+    /// [`instance.reset()`][reset].
+    ///
+    /// [reset]: DendroverseInstance::reset
+    #[inline]
     pub fn solve_using_nice_dtd(&mut self, threads_count: usize) -> anyhow::Result<()>
     where
         MemoType: NiceDTDMemo<AdditionalDataType>,
     {
-        let result = solve::solve_using_nice_dtd(&mut self.dtds, self.additional_data, threads_count);
+
+        if self.is_instance_solved {
+            return Ok(());
+        }
+
+        let result =
+            if threads_count >= 2 {
+                solve::solve_using_nice_dtd_multithread(&mut self.dtds, self.additional_data, threads_count)
+            } else {
+                solve::solve_using_nice_dtd_singlethread(&mut self.dtds, self.additional_data)
+            };
+
         self.is_instance_solved = true;
+
         result
+
+    }
+
+    /// Resets the `DendroverseInstance`.
+    ///
+    /// Calling this function will clear all records from all memos and restore their values to their defaults.
+    /// This enables the instance to be solved again.
+    ///
+    /// Note that calling this method requires your `MemoType` to implement `Default`.
+    /// If your `MemoType` doesn't implement `Default`, call [`instance.reset_unchecked()`][reset_unch] instead.
+    /// In this case, it'll be your responsibility to manually clear the contents of the memos at the beginning of each payload.
+    ///
+    /// [reset_unch]: DendroverseInstance::reset_unchecked
+    pub fn reset(&mut self)
+    where
+        MemoType: Default,
+    {
+        for dtd in self.dtds.iter_mut() {
+            for node in dtd.nodes.iter() {
+                node.lock().unwrap().memo = MemoType::default();
+            }
+        }
+        self.is_instance_solved = false;
+    }
+
+    /// Blindly resets the `DendroverseInstance`.
+    ///
+    /// Calling this function will simply mark the instance as unsolved, however, the memos of the tree decomposition nodes will keep all the data.
+    /// If you call this function aiming to solve the instance again, it'll be your responsibility to manually clear the contents of the memos
+    /// at the beginning of each payload.
+    pub fn reset_unchecked(&mut self) {
+        self.is_instance_solved = false;
     }
 
 }

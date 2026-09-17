@@ -48,13 +48,13 @@ struct AvailableJobs<JobType> {
 
 
 
-pub(super) fn solve_using_nice_dtd<MemoType, AdditionalDataType>(
+pub(super) fn solve_using_nice_dtd_multithread<MemoType, AdditionalDataType>(
     dtds: &mut Vec<crate::dtd::DirectedTreeDecomposition<MemoType>>,
     additional_data: &AdditionalDataType,
     threads_count: usize,
 ) -> anyhow::Result<()>
 where
-    MemoType: Default + Send + Sync + crate::NiceDTDMemo<AdditionalDataType>,
+    MemoType: Send + Sync + crate::NiceDTDMemo<AdditionalDataType>,
     AdditionalDataType: Sync,
 {
     // Populate the initial available jobs queue with the leaves of the tree decompositions
@@ -189,7 +189,7 @@ fn nice_dtd_worker_thread<MemoType, AdditionalDataType>(
     additional_data: &AdditionalDataType,
 )
 where
-    MemoType: Default + crate::NiceDTDMemo<AdditionalDataType>,
+    MemoType: crate::NiceDTDMemo<AdditionalDataType>,
 {
 
     loop {
@@ -253,5 +253,102 @@ where
         }
 
     }
+
+}
+
+
+
+pub(super) fn solve_using_nice_dtd_singlethread<MemoType, AdditionalDataType>(
+    dtds: &mut Vec<crate::dtd::DirectedTreeDecomposition<MemoType>>,
+    additional_data: &AdditionalDataType,
+) -> anyhow::Result<()>
+where
+    MemoType: crate::NiceDTDMemo<AdditionalDataType>,
+{
+
+    for dtd in dtds {
+
+        let mut node_queue = VecDeque::from_iter(dtd.iter_leaves());
+        let mut one_child_processed_join_nids = FxHashSet::with_hasher(FxBuildHasher::new());
+
+        while !node_queue.is_empty() {
+
+            let (nid, node) = node_queue.pop_front().unwrap();
+            let mut node = node.lock().unwrap();
+            let children_nids = & unsafe { dtd.adj_list.get_unchecked(nid) }.children_nids;
+            let parent_nid_option = unsafe { dtd.adj_list.get_unchecked(nid) }.parent_nid;
+            let siblings_count =
+                match parent_nid_option {
+                    Some(parent_nid) => unsafe { dtd.adj_list.get_unchecked(parent_nid) }.children_nids.len(),
+                    None => 0,
+                };
+
+            // Process the node, call payloads
+            match children_nids.len() {
+
+                0 => {
+
+                    let crate::dtd::DTDNode::<MemoType> { bag: node_bag, memo: node_memo, .. } = &mut *node;
+
+                    node_memo.leaf_payload(node_bag, additional_data);
+
+                },
+
+                1 => {
+
+                    let child_nid = unsafe { *children_nids.get_unchecked(0) };
+                    let child_node = unsafe { dtd.nodes.get_unchecked(child_nid) }.lock().unwrap();
+
+                    let forgotten_vids = child_node.bag.iter().filter(|vid| !node.bag.contains(vid)).cloned().collect();
+                    let introduced_vids = node.bag.iter().filter(|vid| !child_node.bag.contains(vid)).cloned().collect();
+
+                    node.memo.forget_introduce_payload(
+                        &child_node.bag,
+                        child_nid,
+                        &child_node.memo,
+                        &forgotten_vids,
+                        &introduced_vids,
+                        additional_data,
+                    );
+
+                },
+
+                2 => {
+
+                    let child1_nid = unsafe { *children_nids.get_unchecked(0) };
+                    let child1_node = unsafe { dtd.nodes.get_unchecked(child1_nid) }.lock().unwrap();
+                    let child2_nid = unsafe { *children_nids.get_unchecked(1) };
+                    let child2_node = unsafe { dtd.nodes.get_unchecked(child2_nid) }.lock().unwrap();
+
+                    node.memo.join_payload(
+                        &child1_node.bag,
+                        child1_nid,
+                        &child1_node.memo,
+                        child2_nid,
+                        &child2_node.memo,
+                        additional_data
+                    );
+
+                },
+
+                _ => return Err(anyhow::anyhow!("A node with more than two children was encountered in a nice tree decomposition.")),
+
+            }
+
+            if let Some(parent_nid) = parent_nid_option {
+
+                if siblings_count <= 1 || one_child_processed_join_nids.contains(&parent_nid) {
+                    node_queue.push_back((parent_nid, Arc::clone( unsafe { dtd.nodes.get_unchecked(parent_nid) } )));
+                } else {
+                    one_child_processed_join_nids.insert(parent_nid);
+                }
+
+            }
+
+        }
+
+    }
+
+    Ok(())
 
 }
