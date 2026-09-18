@@ -182,20 +182,18 @@ impl dendroverse::NiceDTDMemo<MyGraph> for MaxIndependentSetMemo {
 
 impl dendroverse::BacktrackableMemo for MaxIndependentSetMemo {
 
-    type AnswerType = FxHashSet<usize>;
+    type SolutionType = FxHashSet<usize>;
     type BacktrackingHint = usize;
-    type PartialAnswerType = FxHashSet<usize>;
+    type PartialSolutionType = FxHashSet<usize>;
 
     fn extend_partial_solution(
         &self,
         _nid: usize,
-        partial_solution: Option<Self::PartialAnswerType>,
+        mut partial_solution: Self::PartialSolutionType,
         hint: Option<Self::BacktrackingHint>,
         children_nids: &Vec<usize>
-    ) -> (Option<Self::PartialAnswerType>, Vec<Option<Self::BacktrackingHint>>)
+    ) -> (Option<Self::PartialSolutionType>, Vec<Option<Self::BacktrackingHint>>)
     {
-
-        let mut partial_solution = partial_solution.unwrap();
 
         let memo_entry_id =
             match hint {
@@ -329,14 +327,14 @@ fn disconnected_graph() {
             .unwrap();
 
     max_independent_set_instance.solve_using_nice_dtd(15).unwrap();
-    let answer = max_independent_set_instance.answer().unwrap();
+    let answer = max_independent_set_instance.solution().unwrap();
     assert_eq!(answer.len(), 2);
     println!("Optimal solution (concurrent): {:?}", answer);
 
     max_independent_set_instance.reset();
 
     max_independent_set_instance.solve_using_nice_dtd(1).unwrap();
-    let answer = max_independent_set_instance.answer().unwrap();
+    let answer = max_independent_set_instance.solution().unwrap();
     assert_eq!(answer.len(), 2);
     println!("Optimal solution (sequential): {:?}", answer);
 
@@ -372,14 +370,14 @@ fn wikipedia_graph() {
             .unwrap();
 
     max_independent_set_instance.solve_using_nice_dtd(15).unwrap();
-    let answer = max_independent_set_instance.answer().unwrap();
+    let answer = max_independent_set_instance.solution().unwrap();
     assert_eq!(answer.len(), 6);
     println!("Optimal solution (concurrent): {:?}", answer);
 
     max_independent_set_instance.reset();
 
     max_independent_set_instance.solve_using_nice_dtd(1).unwrap();
-    let answer = max_independent_set_instance.answer().unwrap();
+    let answer = max_independent_set_instance.solution().unwrap();
     assert_eq!(answer.len(), 6);
     println!("Optimal solution (sequential): {:?}", answer);
 

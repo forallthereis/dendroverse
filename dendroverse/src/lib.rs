@@ -1,4 +1,33 @@
-//! # dendroverse.rs
+//! <style>
+//!     @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500&display=swap');
+//!
+//!     .fredoka-title {
+//!         font-family: "Fredoka", sans-serif;
+//!         font-optical-sizing: auto;
+//!         font-weight: 500;
+//!         font-size: 6vw;
+//!         font-style: normal;
+//!         font-variation-settings: "wdth" 100;
+//!         margin: 0;
+//!         text-align: center;
+//!     }
+//!
+//!     .gradient-title {
+//!         background: #DF0000;
+//!         background: linear-gradient(to bottom, #DF0000 0%, #850000 100%);
+//!         -webkit-background-clip: text;
+//!         -webkit-text-fill-color: transparent;
+//!     }
+//! </style>
+//! <p class="fredoka-title">
+//!     dendroverse<span class="gradient-title">.rs</span>
+//! </p>
+//! <!-- <span style="text-align: center;"> -->
+//!
+//! <!-- _Part of Project Dendroverse_ -->
+//!
+//! <!-- </span> -->
+//! <br>
 //!
 //! ```text
 //! cargo add dendroverse
@@ -11,7 +40,7 @@
 //! ## ✅ What this crate does for you
 //! * Generates optimal tree decompsitions (using [`arboretum_td`][arboretum] under the hood).
 //! * Transforms tree decompositions into nice tree decompositions.
-//! * Implements a **multi-threaded**, dynamic programming-based solution process that includes job orchestration for multiple threads.
+//! * Implements a **multi-threaded**, dynamic-programming-based solution process that includes job orchestration for multiple threads.
 //! * Constructs an explicit solution using backtracking.
 //!
 //! ## ❎ What this crate doesn't do for you
@@ -102,15 +131,15 @@ mod solve;
 /// This method must only be used when the instance was created using one of the following functions:
 ///     * [`DendroverseInstance::<MemoType, _>::with_auto_generated_nice_dtd(...)`][auto_nice_dtds]
 ///
-/// ## Retrieving an answer
+/// ## Retrieving a solution
 ///
-/// Once a `DendroverseInstance` is solved, you usually want to see the answer to the solved problem.
-/// It can be retrieved by calling [`instance.answer()`][answer].
+/// Once a `DendroverseInstance` is solved, you usually want to see the solution to the solved problem.
+/// It can be retrieved by calling [`instance.solution()`][soln].
 /// Note that this method is only available when your `MemoType` implements [`BacktrackableMemo`].
 ///
 /// [auto_nice_dtds]: DendroverseInstance::with_auto_generated_nice_dtd
 /// [solve_nice_dtds]: DendroverseInstance::solve_using_nice_dtd
-/// [answer]: DendroverseInstance::answer
+/// [soln]: DendroverseInstance::solution
 pub struct DendroverseInstance<'a, MemoType, AdditionalDataType>
 where
     MemoType: Send + Sync,
@@ -127,29 +156,14 @@ where
     AdditionalDataType: Sync,
 {
 
-    /// Retrieves an answer to the solved problem.
-    ///
-    /// Returns `Some(answer)` if the `DendroverseInstance` is solved and a solution exists, `None` otherwise.
-    #[inline]
-    pub fn answer(&self) -> Option<MemoType::AnswerType>
-    where
-        MemoType: BacktrackableMemo,
-    {
-        if self.is_instance_solved {
-            backtrack_answer_from_root_nodes(&self.dtds)
-        } else {
-            None
-        }
-    }
-
     /// Creates a new `DendroverseInstance` with automatically generated nice tree decompositions for the given original graph.
     ///
     /// Here, the arguments are as follows:
     /// * `og_graph`
     /// An immutable reference to the original graph.
     /// * `additional_data`
-    /// Data that can be immutably accessed from a node payload function during the solution process to check the feasibility of
-    /// the newly constructed partial solutions.
+    /// Data that can be immutably accessed from a node payload function during the solution process to check the local feasibility of
+    /// the newly constructed memo entries.
     ///
     /// Note that a separate nice tree decomposition will be generated for each connected component of `og_graph`.
     /// If multi-threaded dynamic programming is later used to solve the instance, the nodes from all the tree decompositions will be processed concurrently.
@@ -240,6 +254,21 @@ where
 
     }
 
+    /// Retrieves a solution to the solved problem.
+    ///
+    /// Returns `Some(solution)` if the `DendroverseInstance` is solved and a solution exists, `None` otherwise.
+    #[inline]
+    pub fn solution(&self) -> Option<MemoType::SolutionType>
+    where
+        MemoType: BacktrackableMemo,
+    {
+        if self.is_instance_solved {
+            backtrack_solution_from_root_nodes(&self.dtds)
+        } else {
+            None
+        }
+    }
+
     /// Resets the `DendroverseInstance`.
     ///
     /// Calling this function will clear all records from all memos and restore their values to their defaults.
@@ -275,30 +304,83 @@ where
 
 
 
+/// # Trait for memos that support solution retrieval using backtracking
+///
+/// While dynamic programming traverses tree decompositions bottom-up to solve a given [`DendroverseInstance`], backtracking traverses the tree
+/// decompositions of the solved instance top-down to retrieve the solution.
+/// Each iterative step of this top-down traversal must be implemented by you for your `MemoType`.
+///
+/// Keep in mind that if you use the automatic generation of tree decompositions to create your [`DendroverseInstance`], then each connected
+/// component of the original graph will have its own tree decomposition.
+/// During backtracking, all tree decompositions will be processed consecutively, in a single thread.
 pub trait BacktrackableMemo {
 
-    type AnswerType;
+    /// The type of a complete solution that will be returned to the user.
+    type SolutionType;
+    /// The type to be used as a hint during backtracking.
+    /// This is useful for backlinking.
+    /// Specifically, when backlinking is used, each entry stored in a node's memo also records the IDs of the entries
+    /// stored in its children's memos from which it was derived.
+    /// These IDs can be passed as hints to the children's memos so that they know what entry to look up in their memos to further
+    /// extend the existing partial solution.
     type BacktrackingHint;
-    type PartialAnswerType: Default + TryInto<Self::AnswerType>;
+    /// The type of a partial solution.
+    /// Partial solutions are constructed step by step during backtracking and are typically extended after processing each node.
+    /// At the end of the process, a partial solution is converted into a complete solution of type `Self::SolutionType`.
+    type PartialSolutionType: Default + TryInto<Self::SolutionType>;
 
+    /// Extends a given partial solution by processing the memo.
+    ///
+    /// This function is called from [`instance.solution()`][soln] for every node of all available tree decompositions.
+    /// The order in which the nodes are processed corresponds to the top-down traversal of the tree decomposition, i.e. a non-root
+    /// node can only be processed if its parent is already processed.
+    ///
+    /// The arguments of this function have the following semantics:
+    /// * `nid`
+    /// The ID of the node that the memo (`self`) belongs to.
+    /// This value can be used to interpret the message sent to the memo as a hint.
+    /// * `partial_solution`
+    /// A partial solution constructed so far.
+    /// At the very start of the process (when this function is called for the memo of the root node of the first tree decomposition),
+    /// the value of `partial_solution` is `Self::PartialSolutionType::default()`.
+    /// * `hint`
+    /// The hint passed to the memo by the parent's memo.
+    /// Since backlinking is an option for you and not an obligation, you can always pass `None` for this argument.
+    /// Note, however, that `None` will always be passed as a hint to the root node of each available tree decomposition.
+    /// This is because root nodes don't have any parents and each tree decomposition is processed independently.
+    /// Therefore, there's nothing to hint at in this case.
+    /// * `children_nids`
+    /// The IDs of all children nodes relative to the node that the memo belongs to.
+    /// These may be useful for constructing hints for them.
+    ///
+    /// This function must return a 2-tuple with the following components:
+    /// * `Option<Self::PartialSolutionType>`
+    /// The extended partial solution.
+    /// Value `None` must be returned if the instance turns out to have no solutions (e.g. if the optimisation problem instance is infeasible).
+    /// This will immediately interrupt the backtracking and the upstream function [`instance.solution()`][soln] will also immediately return `None`.
+    /// * `Vec<Option<Self::BacktrackingHint>>`
+    /// Hints for the children nodes.
+    /// Each _i_-th hint in the vector must correspond to the _i_-th child in `children_nids`.
+    ///
+    /// [soln]: DendroverseInstance::solution
     fn extend_partial_solution(
         &self,
         nid: usize,
-        partial_solution: Option<Self::PartialAnswerType>,
+        partial_solution: Self::PartialSolutionType,
         hint: Option<Self::BacktrackingHint>,
         children_nids: &Vec<usize>
-    ) -> (Option<Self::PartialAnswerType>, Vec<Option<Self::BacktrackingHint>>);
+    ) -> (Option<Self::PartialSolutionType>, Vec<Option<Self::BacktrackingHint>>);
 
 }
 
 
 
-fn backtrack_answer_from_root_nodes<MemoType>(dtds: &Vec<dtd::DirectedTreeDecomposition<MemoType>>) -> Option<MemoType::AnswerType>
+fn backtrack_solution_from_root_nodes<MemoType>(dtds: &Vec<dtd::DirectedTreeDecomposition<MemoType>>) -> Option<MemoType::SolutionType>
 where
     MemoType: BacktrackableMemo,
 {
 
-    let mut partial_solution = Some(MemoType::PartialAnswerType::default());
+    let mut partial_solution = Some(MemoType::PartialSolutionType::default());
 
     for dtd in dtds.iter() {
 
@@ -313,7 +395,7 @@ where
 
             (partial_solution, children_hints) = memo.extend_partial_solution(
                 nid,
-                partial_solution,
+                partial_solution.unwrap(),
                 hint,
                 children_nids,
             );
@@ -334,21 +416,65 @@ where
 
 
 
+/// # Trait for original graphs supporting the automatic generation of tree decompositions
+///
+/// Implement this trait for your original graph type if you intend to generate the tree decompositions for it
+/// automatically.
 pub trait DendroverseOgGraphInterface {
+
+    /// Must return the number of vertices in the graph.
     fn vertices_count(&self) -> usize;
+
+    /// Must return an iterator over all edges of the graph.
+    ///
+    /// Each edge must be represented by a 2-tuple `(usize, usize)` whose elements are the IDs of the vertices incident on it.
+    /// Each edge must be undirected, the order of vertices is not important.
     fn iter_edges(&self) -> impl Iterator<Item = (usize, usize)>;
+
 }
 
 
 
+/// # Trait for memos that support dynamic programming over nice tree decompositions
+///
+/// Keep in mind that if you use the automatic generation of tree decompositions to create your [`DendroverseInstance`], then each connected
+/// component of the original graph will have its own nice tree decomposition.
+/// Here, dynamic programming is applied independently to each available tree decomposition.
 pub trait NiceDTDMemo<AdditionalDataType> {
 
+    /// Must populate the memo of a leaf node.
+    ///
+    /// The memo (`self`) is guaranteed to belong to a leaf node.
+    /// Here, the arguments are:
+    /// * `bag`
+    /// Bag stored in the node owning the memo.
+    /// * `additional_data`
+    /// The data that were passed to the [`DendroverseInstance`] constructor.
+    /// See its documentation for more detail.
     fn leaf_payload(
         &mut self,
         bag: &Vec<usize>,
         additional_data: &AdditionalDataType,
     );
 
+    /// Must populate the memo of a forget-introduce node.
+    ///
+    /// The memo (`self`) is guaranteed to belong to a forget-introduce node.
+    /// Here, the arguments are:
+    /// * `child_bag`
+    /// The child node's bag.
+    /// * `child_nid`
+    /// The child node's ID.
+    /// This value can be used for backlinking.
+    /// * `child_memo`
+    /// The child node's memo.
+    /// * `forgotten_vids`
+    /// The set of forgotten vertices.
+    /// * `introduced_vids`
+    /// The set of introduced vertices.
+    /// * `additional_data`
+    /// The data that were passed to the [`DendroverseInstance`] constructor.
+    /// See its documentation for more detail.
     fn forget_introduce_payload(
         &mut self,
         child_bag: &Vec<usize>,
@@ -359,6 +485,25 @@ pub trait NiceDTDMemo<AdditionalDataType> {
         additional_data: &AdditionalDataType,
     );
 
+    /// Must populate the memo of a join node.
+    ///
+    /// The memo (`self`) is guaranteed to belong to a join node.
+    /// Here, the arguments are:
+    /// * `children_bag`
+    /// The bag of the node owning the memo and the bag of both child nodes.
+    /// * `child1_nid`
+    /// The first child node's ID.
+    /// This value can be used for backlinking.
+    /// * `child1_memo`
+    /// The first child node's memo.
+    /// * `child2_nid`
+    /// The second child node's ID.
+    /// This value can be used for backlinking.
+    /// * `child2_memo`
+    /// The second child node's memo.
+    /// * `additional_data`
+    /// The data that were passed to the [`DendroverseInstance`] constructor.
+    /// See its documentation for more detail.
     fn join_payload(
         &mut self,
         children_bag: &Vec<usize>,
