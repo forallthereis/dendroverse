@@ -1,5 +1,6 @@
 use std::{collections::{HashSet, VecDeque}, sync::{Arc, Mutex}};
 
+use arboretum_td::{graph::MutableGraph, solver::AtomSolver};
 use itertools::Itertools;
 
 
@@ -42,6 +43,53 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
         DTDLeafIter { dtd: self, nid: 0 }
     }
 
+    /// Builds a new directed tree decomposition from the given Arboretum_TD tree decomposition
+    pub(super) fn dtd_from(td: arboretum_td::tree_decomposition::TreeDecomposition) -> Self
+    where
+        MemoType: Default,
+    {
+
+        let mut answer = DirectedTreeDecomposition { root_nid: 0, adj_list: Vec::new(), nodes: Vec::new() };
+
+        // Assign the central node of the given tree decomposition to be the root
+        // This is a ~heuristic~ that, as we hope, leads to the balanced branches of the nice tree decomposition
+        let td_root_nid = arboretum_td_centre(&td);
+
+        // Add the root
+        answer.add_node(
+            None,
+            unsafe { td.bags.get_unchecked(td_root_nid) }.vertex_set.iter().cloned().sorted().collect(),
+            MemoType::default(),
+        );
+
+        let mut unmapped_td_nids = VecDeque::from_iter(
+            unsafe { td.bags.get_unchecked(td_root_nid) }.neighbors.iter().cloned().map(|nid| (nid, td_root_nid))
+        );
+        let mut nid_map = vec![0; td.bags.len()];
+
+        while let Some((td_nid, td_parent_nid)) = unmapped_td_nids.pop_front() {
+
+            let dtd_parent_nid = unsafe { *nid_map.get_unchecked(td_parent_nid) };
+            let dtd_nid = answer.add_node(
+                Some(dtd_parent_nid),
+                unsafe { td.bags.get_unchecked(td_nid) }.vertex_set.iter().cloned().sorted().collect(),
+                MemoType::default(),
+            );
+            unsafe { *nid_map.get_unchecked_mut(td_nid) = dtd_nid; }
+
+            unmapped_td_nids.extend(
+                unsafe { td.bags.get_unchecked(td_nid) }
+                    .neighbors
+                    .iter()
+                    .filter_map(|nid| if *nid != td_parent_nid { Some((*nid, td_parent_nid)) } else { None })
+            );
+
+        }
+
+        answer
+
+    }
+
     /// Builds a new nice directed tree decompostion from the given Arboretum_TD tree decomposition
     pub(super) fn nice_dtd_from(td: arboretum_td::tree_decomposition::TreeDecomposition) -> Self
     where
@@ -52,16 +100,16 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
 
         // Assign the central node of the given tree decomposition to be the root
         // This is a ~heuristic~ that, as we hope, leads to the balanced branches of the nice tree decomposition
-        let td_root = arboretum_td_centre(&td);
+        let td_root_nid = arboretum_td_centre(&td);
 
         // Add the root
         answer.add_node(
             None,
-            unsafe { td.bags.get_unchecked(td_root) }.vertex_set.iter().cloned().sorted().collect(),
+            unsafe { td.bags.get_unchecked(td_root_nid) }.vertex_set.iter().cloned().sorted().collect(),
             MemoType::default(),
         );
 
-        let mut unexplored_td_parent_nids = VecDeque::from([(td_root, td_root)]);
+        let mut unexplored_td_parent_nids = VecDeque::from([(td_root_nid, td_root_nid)]);
         let mut unmapped_td_children_nids = VecDeque::new();
         let mut nid_map = vec![0; td.bags.len()];
 
@@ -165,6 +213,63 @@ impl<'a, MemoType> Iterator for DTDLeafIter<'a, MemoType> {
         }
         None
     }
+
+}
+
+
+
+pub(super) fn auto_generate_dtds<MemoType, OgGraphType>(
+    og_graph: &OgGraphType,
+    make_nice: bool,
+) -> anyhow::Result<Vec<DirectedTreeDecomposition<MemoType>>>
+where
+    MemoType: Default,
+    OgGraphType: crate::DendroverseOgGraphInterface,
+{
+
+    let mut og_graph_arboretum = arboretum_td::graph::HashMapGraph::with_capacity(og_graph.vertices_count());
+    for vid in 0..og_graph.vertices_count() {
+        og_graph_arboretum.add_vertex(vid);
+    }
+    for (vid1, vid2) in og_graph.iter_edges() {
+        og_graph_arboretum.add_edge(vid1, vid2);
+    }
+
+    let mut dtds = Vec::new();
+    let ccs = og_graph_arboretum.connected_components();
+
+    if ccs.len() == 1 {
+        let td_generator = arboretum_td::exact::TamakiPid::with_graph(&og_graph_arboretum);
+        dtds.push(
+            match td_generator.compute() {
+                arboretum_td::solver::ComputationResult::Bounds(_) => return Err(anyhow::anyhow!("The automatic generation of the tree decomposition failed.")),
+                arboretum_td::solver::ComputationResult::ComputedTreeDecomposition(td) =>
+                    match make_nice {
+                        true => DirectedTreeDecomposition::nice_dtd_from(td),
+                        false => DirectedTreeDecomposition::dtd_from(td),
+                    },
+            }
+        );
+
+        return Ok(dtds)
+    }
+
+    for cc_vids in ccs {
+        let cc = og_graph_arboretum.vertex_induced_subgraph(&cc_vids);
+        let cc_td_generator = arboretum_td::exact::TamakiPid::with_graph(&cc);
+        dtds.push(
+            match cc_td_generator.compute() {
+                arboretum_td::solver::ComputationResult::Bounds(_) => return Err(anyhow::anyhow!("The automatic generation of the tree decomposition failed.")),
+                arboretum_td::solver::ComputationResult::ComputedTreeDecomposition(td) =>
+                match make_nice {
+                    true => DirectedTreeDecomposition::nice_dtd_from(td),
+                    false => DirectedTreeDecomposition::dtd_from(td),
+                },
+            }
+        );
+    }
+
+    Ok(dtds)
 
 }
 

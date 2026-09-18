@@ -99,8 +99,6 @@
 //! [arboretum]: https://docs.rs/arboretum-td/latest/arboretum_td/index.html
 use std::collections::VecDeque;
 
-use arboretum_td::{graph::MutableGraph, solver::AtomSolver};
-
 mod dtd;
 mod solve;
 
@@ -116,12 +114,18 @@ mod solve;
 /// ## Creating a new instance
 ///
 /// Currently, you have the following options to create a new `DendroverseInstance`:
+/// * [`DendroverseInstance::<MemoType, _>::with_auto_generated_dtd(...)`][auto_dtds]
+/// Use this when you have an original graph and you want to solve your problem using dynamic programming over **arbitrary** directed tree decompositions.
+/// This function will generate an optimal directed tree decomposition for your graph automatically.
+/// Note that if you want to use this option, your data must satisfy the following additional requirements:
+///     * Your original graph must be of type that implements [`DendroverseOgGraphInterface`].
+///     * Your `MemoType` must implement `Default` and [`DTDMemo`].
 /// * [`DendroverseInstance::<MemoType, _>::with_auto_generated_nice_dtd(...)`][auto_nice_dtds]
-/// Use this when you have an original graph and you want to solve your problem using dynamic programming over nice tree decompositions.
+/// Use this when you have an original graph and you want to solve your problem using dynamic programming over **nice** tree decompositions.
 /// This function will generate an optimal nice tree decomposition for your graph automatically.
 /// Note that if you want to use this option, your data must satisfy the following additional requirements:
 ///     * Your original graph must be of type that implements [`DendroverseOgGraphInterface`].
-///     * Your `MemoType` must implement [`NiceDTDMemo`].
+///     * Your `MemoType` must implement `Default` and [`NiceDTDMemo`].
 ///
 /// ## Solving an instance
 ///
@@ -137,6 +141,7 @@ mod solve;
 /// It can be retrieved by calling [`instance.solution()`][soln].
 /// Note that this method is only available when your `MemoType` implements [`BacktrackableMemo`].
 ///
+/// [auto_dtds]: DendroverseInstance::with_auto_generated_dtd
 /// [auto_nice_dtds]: DendroverseInstance::with_auto_generated_nice_dtd
 /// [solve_nice_dtds]: DendroverseInstance::solve_using_nice_dtd
 /// [soln]: DendroverseInstance::solution
@@ -156,6 +161,35 @@ where
     AdditionalDataType: Sync,
 {
 
+    /// Creates a new `DendroverseInstance` with automatically generated directed tree decompositions for the given original graph.
+    ///
+    /// Here, the arguments are as follows:
+    /// * `og_graph`
+    /// An immutable reference to the original graph.
+    /// * `additional_data`
+    /// Data that can be immutably accessed from a node payload function during the solution process to check the local feasibility of
+    /// the newly constructed memo entries.
+    ///
+    /// Note that a separate tree decomposition will be generated for each connected component of `og_graph`.
+    /// If multi-threaded dynamic programming is later used to solve the instance, the nodes from all the tree decompositions will be processed concurrently.
+    /// If single-threaded dynamic programming is used instead, the nice tree decompositions will be processed sequentially, in a single thread.
+    /// During backtracking, the nice tree decompositions will always be processed sequentially, in a single thread.
+    ///
+    /// Note also that the generated tree decompositions will be directed, however, no further properties are guaranteed.
+    ///
+    /// This function returns an error if the automatic generation of a tree decomposition fails.
+    #[inline(always)]
+    pub fn with_auto_generated_dtd<OgGraphType>(
+        og_graph: &'a OgGraphType,
+        additional_data: &'a AdditionalDataType,
+    ) -> anyhow::Result<Self>
+    where
+        OgGraphType: DendroverseOgGraphInterface,
+        MemoType: Default + DTDMemo<AdditionalDataType>,
+    {
+        Ok(DendroverseInstance { dtds: dtd::auto_generate_dtds(og_graph, false)?, additional_data, is_instance_solved: false })
+    }
+
     /// Creates a new `DendroverseInstance` with automatically generated nice tree decompositions for the given original graph.
     ///
     /// Here, the arguments are as follows:
@@ -171,6 +205,7 @@ where
     /// During backtracking, the nice tree decompositions will always be processed sequentially, in a single thread.
     ///
     /// This function returns an error if the automatic generation of a nice tree decomposition fails.
+    #[inline(always)]
     pub fn with_auto_generated_nice_dtd<OgGraphType>(
         og_graph: &'a OgGraphType,
         additional_data: &'a AdditionalDataType,
@@ -179,43 +214,7 @@ where
         OgGraphType: DendroverseOgGraphInterface,
         MemoType: Default + NiceDTDMemo<AdditionalDataType>,
     {
-
-        let mut og_graph_arboretum = arboretum_td::graph::HashMapGraph::with_capacity(og_graph.vertices_count());
-        for vid in 0..og_graph.vertices_count() {
-            og_graph_arboretum.add_vertex(vid);
-        }
-        for (vid1, vid2) in og_graph.iter_edges() {
-            og_graph_arboretum.add_edge(vid1, vid2);
-        }
-
-        let mut dtds = Vec::new();
-        let ccs = og_graph_arboretum.connected_components();
-
-        if ccs.len() == 1 {
-            let td_generator = arboretum_td::exact::TamakiPid::with_graph(&og_graph_arboretum);
-            dtds.push(
-                match td_generator.compute() {
-                    arboretum_td::solver::ComputationResult::Bounds(_) => return Err(anyhow::anyhow!("The automatic generation of the nice tree decomposition failed.")),
-                    arboretum_td::solver::ComputationResult::ComputedTreeDecomposition(td) => dtd::DirectedTreeDecomposition::nice_dtd_from(td),
-                }
-            );
-
-            return Ok(DendroverseInstance { dtds, additional_data, is_instance_solved: false })
-        }
-
-        for cc_vids in ccs {
-            let cc = og_graph_arboretum.vertex_induced_subgraph(&cc_vids);
-            let cc_td_generator = arboretum_td::exact::TamakiPid::with_graph(&cc);
-            dtds.push(
-                match cc_td_generator.compute() {
-                    arboretum_td::solver::ComputationResult::Bounds(_) => return Err(anyhow::anyhow!("The automatic generation of the nice tree decomposition failed.")),
-                    arboretum_td::solver::ComputationResult::ComputedTreeDecomposition(td) => dtd::DirectedTreeDecomposition::nice_dtd_from(td),
-                }
-            );
-        }
-
-        Ok(DendroverseInstance { dtds, additional_data, is_instance_solved: false })
-
+        Ok(DendroverseInstance { dtds: dtd::auto_generate_dtds(og_graph, true)?, additional_data, is_instance_solved: false })
     }
 
     /// Solves the`DendroverseInstance` using dynamic programming over nice tree decompositions.
@@ -329,7 +328,7 @@ pub trait BacktrackableMemo {
     /// At the end of the process, a partial solution is converted into a complete solution of type `Self::SolutionType`.
     type PartialSolutionType: Default + TryInto<Self::SolutionType>;
 
-    /// Extends a given partial solution by processing the memo.
+    /// Must extend a given partial solution by processing the memo.
     ///
     /// This function is called from [`instance.solution()`][soln] for every node of all available tree decompositions.
     /// The order in which the nodes are processed corresponds to the top-down traversal of the tree decomposition, i.e. a non-root
@@ -345,8 +344,7 @@ pub trait BacktrackableMemo {
     /// the value of `partial_solution` is `Self::PartialSolutionType::default()`.
     /// * `hint`
     /// The hint passed to the memo by the parent's memo.
-    /// Since backlinking is an option for you and not an obligation, you can always pass `None` for this argument.
-    /// Note, however, that `None` will always be passed as a hint to the root node of each available tree decomposition.
+    /// `None` will always be passed as a hint to the root node of each available tree decomposition.
     /// This is because root nodes don't have any parents and each tree decomposition is processed independently.
     /// Therefore, there's nothing to hint at in this case.
     /// * `children_nids`
@@ -361,6 +359,7 @@ pub trait BacktrackableMemo {
     /// * `Vec<Option<Self::BacktrackingHint>>`
     /// Hints for the children nodes.
     /// Each _i_-th hint in the vector must correspond to the _i_-th child in `children_nids`.
+    /// Since using backlinking is an option for you and not an obligation, you can always return a vector of `None` or nonsensical values.
     ///
     /// [soln]: DendroverseInstance::solution
     fn extend_partial_solution(
@@ -435,11 +434,50 @@ pub trait DendroverseOgGraphInterface {
 
 
 
+/// # Trait for memos that support dynamic programming over arbitrary directed tree decompositions
+///
+/// Keep in mind that if you use the automatic generation of tree decompositions to create your [`DendroverseInstance`], then each connected
+/// component of the original graph will have its own nice tree decomposition.
+/// In this case, dynamic programming will be applied independently to each available tree decomposition.
+pub trait DTDMemo<AdditionalDataType> {
+
+    /// Must populate the memo of a node.
+    ///
+    /// The memo to be populated is `self`.
+    /// Here, the arguments are:
+    /// * `bag`
+    /// The bag of the node owning the memo.
+    /// * `children_bags`
+    /// The bags of all child nodes.
+    /// * `children_nids`
+    /// The IDs of all child nodes.
+    /// These values can be used for backlinking.
+    /// * `children_memos`
+    /// The memos of all child nodes.
+    /// * `additional_data`
+    /// The data that were passed to the [`DendroverseInstance`] constructor.
+    /// These data can be used to validate the local feasibility of each new generated memo entry for `self`.
+    ///
+    /// Vectors `children_bags`, `children_nids` and `children_memos` are guaranteed to have the same length.
+    /// The order of elements in them is consistent.
+    fn payload(
+        &mut self,
+        bag: &Vec<usize>,
+        children_bags: Vec<&Vec<usize>>,
+        children_nids: Vec<usize>,
+        children_memos: Vec<&Self>,
+        additional_data: &AdditionalDataType,
+    );
+
+}
+
+
+
 /// # Trait for memos that support dynamic programming over nice tree decompositions
 ///
 /// Keep in mind that if you use the automatic generation of tree decompositions to create your [`DendroverseInstance`], then each connected
 /// component of the original graph will have its own nice tree decomposition.
-/// Here, dynamic programming is applied independently to each available tree decomposition.
+/// In this case, dynamic programming will be applied independently to each available tree decomposition.
 pub trait NiceDTDMemo<AdditionalDataType> {
 
     /// Must populate the memo of a leaf node.
@@ -447,10 +485,10 @@ pub trait NiceDTDMemo<AdditionalDataType> {
     /// The memo (`self`) is guaranteed to belong to a leaf node.
     /// Here, the arguments are:
     /// * `bag`
-    /// Bag stored in the node owning the memo.
+    /// The bag of the node owning the memo.
     /// * `additional_data`
     /// The data that were passed to the [`DendroverseInstance`] constructor.
-    /// See its documentation for more detail.
+    /// These data can be used to validate the local feasibility of each new generated memo entry for `self`.
     fn leaf_payload(
         &mut self,
         bag: &Vec<usize>,
@@ -474,7 +512,7 @@ pub trait NiceDTDMemo<AdditionalDataType> {
     /// The set of introduced vertices.
     /// * `additional_data`
     /// The data that were passed to the [`DendroverseInstance`] constructor.
-    /// See its documentation for more detail.
+    /// These data can be used to validate the local feasibility of each new generated memo entry for `self`.
     fn forget_introduce_payload(
         &mut self,
         child_bag: &Vec<usize>,
@@ -503,7 +541,7 @@ pub trait NiceDTDMemo<AdditionalDataType> {
     /// The second child node's memo.
     /// * `additional_data`
     /// The data that were passed to the [`DendroverseInstance`] constructor.
-    /// See its documentation for more detail.
+    /// These data can be used to validate the local feasibility of each new generated memo entry for `self`.
     fn join_payload(
         &mut self,
         children_bag: &Vec<usize>,
