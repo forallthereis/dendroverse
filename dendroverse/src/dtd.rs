@@ -1,6 +1,7 @@
-use std::{collections::{HashSet, VecDeque}, sync::{Arc, Mutex}};
+use std::{collections::VecDeque, sync::{Arc, Mutex}};
 
 use arboretum_td::{graph::MutableGraph, solver::AtomSolver};
+use fxhash::FxHashSet;
 use itertools::Itertools;
 
 
@@ -282,7 +283,7 @@ where
 /// Distance = minimum path length.
 fn arboretum_td_centre(td: &arboretum_td::tree_decomposition::TreeDecomposition) -> usize {
 
-    let mut visited_nodes: HashSet<usize> = HashSet::from_iter(
+    let mut visited_nodes: FxHashSet<usize> = FxHashSet::from_iter(
         td
             .bags
             .iter()

@@ -99,6 +99,9 @@
 //! [arboretum]: https://docs.rs/arboretum-td/latest/arboretum_td/index.html
 use std::collections::VecDeque;
 
+#[cfg(feature = "integrate-petgraph")]
+use petgraph::visit::EdgeRef;
+
 mod dtd;
 mod solve;
 
@@ -215,6 +218,41 @@ where
         MemoType: Default + NiceDTDMemo<AdditionalDataType>,
     {
         Ok(DendroverseInstance { dtds: dtd::auto_generate_dtds(og_graph, true)?, additional_data, is_instance_solved: false })
+    }
+
+    /// Solves the`DendroverseInstance` using dynamic programming over arbitrary directed tree decompositions.
+    ///
+    /// Here, `threads_count` is the number of worker threads that will be spawned to execute the dynamic-programming-based solution process.
+    /// For large instances, we recommend setting this argument to the number of available logical cores in your system minus one.
+    /// Setting this argument to `0` or `1` will result in a single-threaded dynamic programming.
+    ///
+    /// This function will return an error if one occurs while solving the instance.
+    ///
+    /// Calling this function after the instance was already solved will do nothing.
+    /// If you want to solve the problem again using a different method or number of threads, consider resetting the instance with
+    /// [`instance.reset()`][reset].
+    ///
+    /// [reset]: DendroverseInstance::reset
+    pub fn solve_using_dtd(&mut self, threads_count: usize) -> anyhow::Result<()>
+    where
+        MemoType: DTDMemo<AdditionalDataType>,
+    {
+
+        if self.is_instance_solved {
+            return Ok(());
+        }
+
+        let result =
+            if threads_count >= 2 {
+                solve::solve_using_dtd_multithread(&mut self.dtds, self.additional_data, threads_count)
+            } else {
+                solve::solve_using_dtd_singlethread(&mut self.dtds, self.additional_data)
+            };
+
+        self.is_instance_solved = true;
+
+        result
+
     }
 
     /// Solves the`DendroverseInstance` using dynamic programming over nice tree decompositions.
@@ -429,6 +467,22 @@ pub trait DendroverseOgGraphInterface {
     /// Each edge must be represented by a 2-tuple `(usize, usize)` whose elements are the IDs of the vertices incident on it.
     /// Each edge must be undirected, the order of vertices is not important.
     fn iter_edges(&self) -> impl Iterator<Item = (usize, usize)>;
+
+}
+
+#[cfg(feature = "integrate-petgraph")]
+impl<N, E, Ix> DendroverseOgGraphInterface for petgraph::Graph<N, E, petgraph::Undirected, Ix>
+where
+    Ix: petgraph::stable_graph::IndexType,
+{
+
+    fn vertices_count(&self) -> usize {
+        self.node_count()
+    }
+
+    fn iter_edges(&self) -> impl Iterator<Item = (usize, usize)> {
+        self.edge_references().map(|e| (e.source().index(), e.target().index()))
+    }
 
 }
 
