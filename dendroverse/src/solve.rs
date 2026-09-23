@@ -127,7 +127,7 @@ where
             let parent_nid = unsafe { dtds.get_unchecked(dtdid).adj_list.get_unchecked(nid) }.parent_nid.unwrap();
             let parent_children_nids = & unsafe { dtds.get_unchecked(dtdid).adj_list.get_unchecked(parent_nid) }.children_nids;
 
-            if *unprocessed_children_count.get(&(dtdid, parent_nid)).unwrap() > 0 {
+            if unprocessed_children_count[&(dtdid, parent_nid)] > 1 {
                 *unprocessed_children_count.get_mut(&(dtdid, parent_nid)).unwrap() -= 1;
                 continue;
             }
@@ -148,6 +148,8 @@ where
                 )
 
             );
+
+            available_jobs.not_empty_anymore.notify_one();
 
         }
 
@@ -267,7 +269,7 @@ where
 
             let parent_nid_option = unsafe { dtd.adj_list.get_unchecked(nid) }.parent_nid;
             if let Some(parent_nid) = parent_nid_option {
-                if *unprocessed_children_count.get(&(dtdid, parent_nid)).unwrap() == 0 {
+                if *unprocessed_children_count.get(&(dtdid, parent_nid)).unwrap() == 1 {
                     node_queue.push_back((parent_nid, Arc::clone(unsafe { dtd.nodes.get_unchecked(parent_nid) })));
                 } else {
                     *unprocessed_children_count.get_mut(&(dtdid, parent_nid)).unwrap() -= 1;

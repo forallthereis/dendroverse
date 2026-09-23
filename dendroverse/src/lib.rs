@@ -66,6 +66,10 @@
 //! #### 3. Implement necessary traits
 //! You'll have to implement the necessary payloads for the tree decomposition nodes yourself.
 //! The exact traits you need to implement for your `MemoType` depend on the type of tree decomposition you want to use.
+//! Specifically:
+//! * Implement [`DTDMemo`] for your `MemoType` if your algorithm works with arbitrary tree decompositions.
+//! * Implement [`NiceDTDMemo`] for your `MemoType` if your algorithm requires nice tree decompositions.
+//! * Implement [`BacktrackableMemo`] for your `MemoType` if you want to retrieve solutions after having your problem instance solved.
 //!
 //! #### 4. Create and solve a [`DendroverseInstance`]
 //! When everything's set up, you can finally create and solve a [`DendroverseInstance`].
@@ -189,8 +193,11 @@ where
     ///
     /// Note that a separate tree decomposition will be generated for each connected component of `og_graph`.
     /// If multi-threaded dynamic programming is later used to solve the instance, the nodes from all the tree decompositions will be processed concurrently.
-    /// If single-threaded dynamic programming is used instead, the nice tree decompositions will be processed sequentially, in a single thread.
-    /// During backtracking, the nice tree decompositions will always be processed sequentially, in a single thread.
+    /// If single-threaded dynamic programming is used instead, the nice tree decompositions will be processed sequentially, one after another, in a single thread.
+    /// During backtracking, the nice tree decompositions will always be processed sequentially, one after another, in a single thread.
+    ///
+    /// All memos are guaranteed to initially have values `MemoType::default()`.
+    /// It is also guaranteed that the bags of all nodes are stored as sorted vectors.
     ///
     /// Note also that the generated tree decompositions will be directed, however, no further properties are guaranteed.
     ///
@@ -218,8 +225,11 @@ where
     ///
     /// Note that a separate nice tree decomposition will be generated for each connected component of `og_graph`.
     /// If multi-threaded dynamic programming is later used to solve the instance, the nodes from all the tree decompositions will be processed concurrently.
-    /// If single-threaded dynamic programming is used instead, the nice tree decompositions will be processed sequentially, in a single thread.
-    /// During backtracking, the nice tree decompositions will always be processed sequentially, in a single thread.
+    /// If single-threaded dynamic programming is used instead, the nice tree decompositions will be processed sequentially, one after another, in a single thread.
+    /// During backtracking, the nice tree decompositions will always be processed sequentially, one after another, in a single thread.
+    ///
+    /// All memos are guaranteed to initially have values `MemoType::default()`.
+    /// It is also guaranteed that the bags of all nodes are stored as sorted vectors.
     ///
     /// This function returns an error if the automatic generation of a nice tree decomposition fails.
     #[inline(always)]
@@ -505,10 +515,10 @@ where
 /// # Trait for memos that support dynamic programming over arbitrary directed tree decompositions
 ///
 /// Keep in mind that if you use the automatic generation of tree decompositions to create your [`DendroverseInstance`], then each connected
-/// component of the original graph will have its own nice tree decomposition.
+/// component of the original graph will have its own directed tree decomposition.
 /// In this case, dynamic programming will be applied independently to each available tree decomposition.
 ///
-/// Note also that it's not necessary to implement [`NiceDTDMemo`] in order to implement `DTDMemo` for your `MemoType`.
+/// Note also that you don't have to implement [`NiceDTDMemo`] in order to implement `DTDMemo` for your `MemoType`.
 pub trait DTDMemo<AdditionalDataType> {
 
     /// Must populate the memo of a node.
@@ -549,7 +559,7 @@ pub trait DTDMemo<AdditionalDataType> {
 /// component of the original graph will have its own nice tree decomposition.
 /// In this case, dynamic programming will be applied independently to each available tree decomposition.
 ///
-/// Note also that it's not necessary to implement [`DTDMemo`] in order to implement `NiceDTDMemo` for your `MemoType`.
+/// Note also that you don't have to implement [`DTDMemo`] in order to implement `NiceDTDMemo` for your `MemoType`.
 pub trait NiceDTDMemo<AdditionalDataType> {
 
     /// Must populate the memo of a leaf node.

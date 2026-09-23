@@ -1,3 +1,15 @@
+use std::cmp::Ordering;
+
+// Run the tests using the following command:
+//
+//      cargo test --features integrate-petgraph -- --nocapture
+//
+// This test solves the problem of finding a maximum independent set in a graph
+// using dynamic programming over nice tree decompositions.
+// Here, the original graph is given as an instance of petgraph::Graph<(), (), Undirected, usize>,
+// wrapped into a custom tuple MyGraph.
+// To use this original graph as input, we manually implement dendroverse::DendroverseOgGraphInterface
+// for MyGraph.
 use dendroverse;
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
 use itertools::Itertools;
@@ -85,9 +97,8 @@ impl dendroverse::NiceDTDMemo<MyGraph> for MaxIndependentSetMemo {
     )
     {
 
-        let mut memo_entries_collector =
+        let mut memo_entries_collector: FxHashMap<Vec<usize>, (usize, usize)> =
             FxHashMap
-                ::<Vec<usize>, (usize, usize)>
                 ::with_capacity_and_hasher(child_memo.0.len() * (1 << introduced_vids.len()), FxBuildHasher::new());
 
         for (child_memo_entry_id, child_memo_entry) in child_memo.0.iter().enumerate() {
@@ -143,9 +154,8 @@ impl dendroverse::NiceDTDMemo<MyGraph> for MaxIndependentSetMemo {
     )
     {
 
-        let mut unmatched_memo_entries_collector =
+        let mut unmatched_memo_entries_collector: FxHashMap<Vec<usize>, (usize, usize)> =
             FxHashMap
-                ::<Vec<usize>, (usize, usize)>
                 ::from_iter(child1_memo.0.iter().enumerate().map(|(i, e)| (e.indep_set.clone(), (e.obj_value, i))));
 
         for (child2_memo_entry_id, child2_memo_entry) in child2_memo.0.iter().enumerate() {
@@ -283,14 +293,16 @@ fn subtract_sorted_vecs(minuend: &Vec<usize>, subtrahend: &Vec<usize>) -> Vec<us
             match subtrahend_item_option {
 
                 Some(subtrahend_item) =>
-                    if *minuend_item < *subtrahend_item {
-                        answer.push(*minuend_item);
-                        break;
-                    } else if *minuend_item == *subtrahend_item {
-                        subtrahend_item_option = subtrahend_iter.next();
-                        break;
-                    } else {
-                        subtrahend_item_option = subtrahend_iter.next();
+                    match minuend_item.cmp(subtrahend_item) {
+                        Ordering::Less => {
+                            answer.push(*minuend_item);
+                            break;
+                        },
+                        Ordering::Equal => {
+                            subtrahend_item_option = subtrahend_iter.next();
+                            break;
+                        },
+                        Ordering::Greater => subtrahend_item_option = subtrahend_iter.next(),
                     },
 
                 None => {
@@ -313,16 +325,15 @@ fn subtract_sorted_vecs(minuend: &Vec<usize>, subtrahend: &Vec<usize>) -> Vec<us
 #[test]
 fn disconnected_graph() {
 
-    let og_graph = Graph::<(), (), Undirected, usize>::from_edges([
+    let og_graph: Graph<(), (), Undirected, usize> = Graph::from_edges([
         (0, 1),
         (2, 3),
     ]);
     let og_graph = MyGraph(og_graph);
 
-    let mut max_independent_set_instance =
+    let mut max_independent_set_instance: dendroverse::DendroverseInstance<MaxIndependentSetMemo, MyGraph> =
         dendroverse
             ::DendroverseInstance
-            ::<MaxIndependentSetMemo, _>
             ::with_auto_generated_nice_dtd(&og_graph, &og_graph)
             .unwrap();
 
@@ -343,7 +354,7 @@ fn disconnected_graph() {
 #[test]
 fn wikipedia_graph() {
 
-    let og_graph = Graph::<(), (), Undirected, usize>::from_edges([
+    let og_graph: Graph<(), (), Undirected, usize> = Graph::from_edges([
         (0, 2),
         (0, 3),
         (1, 2),
@@ -362,10 +373,9 @@ fn wikipedia_graph() {
     ]);
     let og_graph = MyGraph(og_graph);
 
-    let mut max_independent_set_instance =
+    let mut max_independent_set_instance: dendroverse::DendroverseInstance<MaxIndependentSetMemo, MyGraph> =
         dendroverse
             ::DendroverseInstance
-            ::<MaxIndependentSetMemo, _>
             ::with_auto_generated_nice_dtd(&og_graph, &og_graph)
             .unwrap();
 

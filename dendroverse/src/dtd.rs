@@ -82,7 +82,7 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
                 unsafe { td.bags.get_unchecked(td_nid) }
                     .neighbors
                     .iter()
-                    .filter_map(|nid| if *nid != td_parent_nid { Some((*nid, td_parent_nid)) } else { None })
+                    .filter_map(|nid| if *nid != td_parent_nid { Some((*nid, td_nid)) } else { None })
             );
 
         }
