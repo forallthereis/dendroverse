@@ -41,7 +41,7 @@
 //! * Generates optimal tree decompsitions (using [`arboretum_td`][arboretum] under the hood).
 //! * Transforms tree decompositions into nice tree decompositions.
 //! * Implements a **multi-threaded**, dynamic-programming-based solution process that includes job orchestration for multiple threads.
-//! * Constructs an explicit solution using backtracking.
+//! * Constructs a solution using backtracking.
 //!
 //! ## ❎ What this crate doesn't do for you
 //! * It doesn’t automatically generate a solution algorithm based on the problem description
@@ -95,8 +95,18 @@
 //!
 //! Note that a classical nice tree decomposition is a special case of a relaxed nice tree decomposition and, hence, can still be used.
 //!
+//! ## 🧱 Additional feature flags
+//!
+//! The default functionality of `dendroverse.rs` can be extended with the following feature flags:
+//! * `integrate-petgraph`
+//! If you work with graphs in Rust, you likely use [`petgraph`][petgraph].
+//! In this case, if your original graph is of type `petgraph::Graph<_, _, petgraph::Undirected, _>`, then you don't need to create a derivative type
+//! in your project and manually implement [`DendroverseOgGraphInterface`] for it.
+//! Instead, you can use your graph directly with `dendroverse.rs` by enabling this feature flag.
+//!
 //! [td_wiki]: https://en.wikipedia.org/wiki/Tree_decomposition
 //! [arboretum]: https://docs.rs/arboretum-td/latest/arboretum_td/index.html
+//! [petgraph]: https://docs.rs/petgraph/latest/petgraph/
 use std::collections::VecDeque;
 
 #[cfg(feature = "integrate-petgraph")]
@@ -133,19 +143,23 @@ mod solve;
 /// ## Solving an instance
 ///
 /// Once a `DendroverseInstance` is successfully created, it can be solved using one of the following methods:
+/// * [`instance.solve_using_dtd(...)`][solve_dtds]
+/// This method solves the problem using dynamic programming over **arbitrary** directed tree decompositions.
+/// This method is only available when your `MemoType` implements [`DTDMemo`].
 /// * [`instance.solve_using_nice_dtd(...)`][solve_nice_dtds]
-/// This method solves the problem using dynamic programming over nice tree decompositions.
+/// This method solves the problem using dynamic programming over **nice** tree decompositions.
 /// This method must only be used when the instance was created using one of the following functions:
 ///     * [`DendroverseInstance::<MemoType, _>::with_auto_generated_nice_dtd(...)`][auto_nice_dtds]
 ///
 /// ## Retrieving a solution
 ///
-/// Once a `DendroverseInstance` is solved, you usually want to see the solution to the solved problem.
-/// It can be retrieved by calling [`instance.solution()`][soln].
+/// Once a `DendroverseInstance` is solved, you may want to see a solution to the solved problem.
+/// A solution of a solved instance can be retrieved by calling [`instance.solution()`][soln].
 /// Note that this method is only available when your `MemoType` implements [`BacktrackableMemo`].
 ///
 /// [auto_dtds]: DendroverseInstance::with_auto_generated_dtd
 /// [auto_nice_dtds]: DendroverseInstance::with_auto_generated_nice_dtd
+/// [solve_dtds]: DendroverseInstance::solve_using_dtd
 /// [solve_nice_dtds]: DendroverseInstance::solve_using_nice_dtd
 /// [soln]: DendroverseInstance::solution
 pub struct DendroverseInstance<'a, MemoType, AdditionalDataType>
@@ -220,7 +234,7 @@ where
         Ok(DendroverseInstance { dtds: dtd::auto_generate_dtds(og_graph, true)?, additional_data, is_instance_solved: false })
     }
 
-    /// Solves the`DendroverseInstance` using dynamic programming over arbitrary directed tree decompositions.
+    /// Solves the `DendroverseInstance` using dynamic programming over arbitrary directed tree decompositions.
     ///
     /// Here, `threads_count` is the number of worker threads that will be spawned to execute the dynamic-programming-based solution process.
     /// For large instances, we recommend setting this argument to the number of available logical cores in your system minus one.
@@ -255,7 +269,7 @@ where
 
     }
 
-    /// Solves the`DendroverseInstance` using dynamic programming over nice tree decompositions.
+    /// Solves the `DendroverseInstance` using dynamic programming over nice tree decompositions.
     ///
     /// Here, `threads_count` is the number of worker threads that will be spawned to execute the dynamic-programming-based solution process.
     /// For large instances, we recommend setting this argument to the number of available logical cores in your system minus one.
@@ -291,7 +305,7 @@ where
 
     }
 
-    /// Retrieves a solution to the solved problem.
+    /// Retrieves a solution to the solved `DendroverseInstance`.
     ///
     /// Returns `Some(solution)` if the `DendroverseInstance` is solved and a solution exists, `None` otherwise.
     #[inline]
@@ -308,7 +322,7 @@ where
 
     /// Resets the `DendroverseInstance`.
     ///
-    /// Calling this function will clear all records from all memos and restore their values to their defaults.
+    /// Calling this function will clear all memos and restore their values to their defaults.
     /// This enables the instance to be solved again.
     ///
     /// Note that calling this method requires your `MemoType` to implement `Default`.
@@ -455,7 +469,7 @@ where
 
 /// # Trait for original graphs supporting the automatic generation of tree decompositions
 ///
-/// Implement this trait for your original graph type if you intend to generate the tree decompositions for it
+/// Implement this trait for your original graph type if you intend to generate tree decompositions for it
 /// automatically.
 pub trait DendroverseOgGraphInterface {
 
@@ -493,6 +507,8 @@ where
 /// Keep in mind that if you use the automatic generation of tree decompositions to create your [`DendroverseInstance`], then each connected
 /// component of the original graph will have its own nice tree decomposition.
 /// In this case, dynamic programming will be applied independently to each available tree decomposition.
+///
+/// Note also that it's not necessary to implement [`NiceDTDMemo`] in order to implement `DTDMemo` for your `MemoType`.
 pub trait DTDMemo<AdditionalDataType> {
 
     /// Must populate the memo of a node.
@@ -532,6 +548,8 @@ pub trait DTDMemo<AdditionalDataType> {
 /// Keep in mind that if you use the automatic generation of tree decompositions to create your [`DendroverseInstance`], then each connected
 /// component of the original graph will have its own nice tree decomposition.
 /// In this case, dynamic programming will be applied independently to each available tree decomposition.
+///
+/// Note also that it's not necessary to implement [`DTDMemo`] in order to implement `NiceDTDMemo` for your `MemoType`.
 pub trait NiceDTDMemo<AdditionalDataType> {
 
     /// Must populate the memo of a leaf node.
