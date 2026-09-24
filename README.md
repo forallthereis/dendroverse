@@ -1,29 +1,3 @@
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500&display=swap');
-
-    .fredoka-title {
-        font-family: "Fredoka", sans-serif;
-        font-optical-sizing: auto;
-        font-weight: 500;
-        font-size: 6vw;
-        font-style: normal;
-        font-variation-settings: "wdth" 100;
-        margin: 0;
-        text-align: center;
-    }
-
-    .gradient-title {
-        background: #DF0000;
-        background: linear-gradient(to bottom, #DF0000 0%, #850000 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-</style>
-<p class="fredoka-title">
-    dendroverse<span class="gradient-title">.rs</span>
-</p>
-<br>
-
 ```text
 cargo add dendroverse
 ```
@@ -62,9 +36,9 @@ When using `dendroverse.rs`, it's your responsibility to implement a custom type
 You'll have to implement the necessary payloads for the tree decomposition nodes yourself.
 The exact traits you need to implement for your `MemoType` depend on the type of tree decomposition you want to use.
 Specifically:
-* Implement [`DTDMemo`] for your `MemoType` if your algorithm works with arbitrary tree decompositions.
-* Implement [`NiceDTDMemo`] for your `MemoType` if your algorithm requires nice tree decompositions.
-* Implement [`BacktrackableMemo`] for your `MemoType` if you want to retrieve solutions after having your problem instance solved.
+* Implement `DTDMemo` for your `MemoType` if your algorithm works with arbitrary tree decompositions.
+* Implement `NiceDTDMemo` for your `MemoType` if your algorithm requires nice tree decompositions.
+* Implement `BacktrackableMemo` for your `MemoType` if you want to retrieve solutions after having your problem instance solved.
 
 #### 4. Create and solve a `DendroverseInstance`
 When everything's set up, you can finally create and solve a `DendroverseInstance`.
@@ -121,4 +95,4 @@ Currently, the traversal is unavoidable.
 [td_wiki]: https://en.wikipedia.org/wiki/Tree_decomposition
 [arboretum]: https://docs.rs/arboretum-td/latest/arboretum_td/index.html
 [petgraph]: https://docs.rs/petgraph/latest/petgraph/
-[examples]: https://github.com/forallthereis/dendroverse/tree/master/tests
+[examples]: https://github.com/forallthereis/dendroverse/tree/main/tests
