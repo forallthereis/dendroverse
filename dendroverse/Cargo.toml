@@ -2,6 +2,8 @@
 name = "dendroverse"
 version = "0.1.0"
 edition = "2024"
+description = "Solve computational problems on graphs using dynamic programming over tree decompositions."
+license = "MIT"
 
 [features]
 integrate-petgraph = ["dep:petgraph"]

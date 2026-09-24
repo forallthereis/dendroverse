@@ -22,11 +22,6 @@
 //! <p class="fredoka-title">
 //!     dendroverse<span class="gradient-title">.rs</span>
 //! </p>
-//! <!-- <span style="text-align: center;"> -->
-//!
-//! <!-- _Part of Project Dendroverse_ -->
-//!
-//! <!-- </span> -->
 //! <br>
 //!
 //! ```text
@@ -53,13 +48,13 @@
 //! ## 🔨 Four steps to use `dendroverse.rs`
 //!
 //! #### 1. Design a dynamic programming algorithm
-//! First and foremost, you should design an algorithm to solve your specific problem using tree decompositions.
+//! First and foremost, you should design an algorithm to solve your specific problem using dynamic programming over tree decompositions.
 //! Your algorithm can be based on either arbitrary directed tree decompositions or nice tree decompositions.
 //! Either way, the important thing is to understand what should be done at each node of the tree decomposition.
 //!
 //! #### 2. Define a `MemoType` for your problem
 //! In our generic code, we use the name `MemoType` to refer to the specific type of **memo** you use.
-//! Each tree decomposition node contains a memo, which is a data structure used to store the partial solutions associated with the node.
+//! Each tree decomposition node contains a memo, which is a data structure used to store records associated with the node.
 //! Memos are sometimes also called **DP-tables**.
 //! When using `dendroverse.rs`, it's your responsibility to implement a custom type (typically a struct) to be used as a memo.
 //!
@@ -102,15 +97,31 @@
 //! ## 🧱 Additional feature flags
 //!
 //! The default functionality of `dendroverse.rs` can be extended with the following feature flags:
-//! * `integrate-petgraph`
-//! If you work with graphs in Rust, you likely use [`petgraph`][petgraph].
-//! In this case, if your original graph is of type `petgraph::Graph<_, _, petgraph::Undirected, _>`, then you don't need to create a derivative type
-//! in your project and manually implement [`DendroverseOgGraphInterface`] for it.
-//! Instead, you can use your graph directly with `dendroverse.rs` by enabling this feature flag.
+//!
+//! | Feature flag | Description |
+//! |:------------:|-------------|
+//! | `integrate-petgraph` | If you work with graphs in Rust, you likely use [`petgraph`][petgraph]. In this case, if your original graph is of type `petgraph::Graph<_, _, petgraph::Undirected, usize>`, then you don't need to create a derivative type in your project and manually implement [`DendroverseOgGraphInterface`] for it. Instead, you can use your graph directly with `dendroverse.rs` by enabling this feature flag. |
+//!
+//! ## 🤓 Examples
+//!
+//! Examples of using `dendroverse.rs` can be found among our [integration tests][examples].
+//! There, we've implemented two algorithms for finding a maximum independent set.
+//! One uses arbitrary directed tree decompositions, the other relies on nice tree decompositions.
+//!
+//! ## 📑 Future plans
+//!
+//! The following features are planned for `dendroverse.rs`:
+//! * **Custom tree decompositions.** Currently, only automatically generated tree decompositions can be used with `dendroverse.rs`.
+//! See the documentation for [`DendroverseInstance`] for more detail.
+//! * **Solutions without backtracking.** When we solve optimisation problems on graphs, it's sometimes sufficient to retrieve an optimal objective
+//! value from the tree decomposition's root node.
+//! This doesn't require constructing a complete optimal solution and, hence, traversing the entire tree.
+//! Currently, the traversal is unavoidable.
 //!
 //! [td_wiki]: https://en.wikipedia.org/wiki/Tree_decomposition
 //! [arboretum]: https://docs.rs/arboretum-td/latest/arboretum_td/index.html
 //! [petgraph]: https://docs.rs/petgraph/latest/petgraph/
+//! [examples]: https://github.com/forallthereis/dendroverse/tree/master/tests
 use std::collections::VecDeque;
 
 #[cfg(feature = "integrate-petgraph")]
@@ -376,8 +387,6 @@ where
 /// During backtracking, all tree decompositions will be processed consecutively, in a single thread.
 pub trait BacktrackableMemo {
 
-    /// The type of a complete solution that will be returned to the user.
-    type SolutionType;
     /// The type to be used as a hint during backtracking.
     /// This is useful for backlinking.
     /// Specifically, when backlinking is used, each entry stored in a node's memo also records the IDs of the entries
@@ -389,6 +398,8 @@ pub trait BacktrackableMemo {
     /// Partial solutions are constructed step by step during backtracking and are typically extended after processing each node.
     /// At the end of the process, a partial solution is converted into a complete solution of type `Self::SolutionType`.
     type PartialSolutionType: Default + TryInto<Self::SolutionType>;
+    /// The type of a complete solution that will be returned to the user.
+    type SolutionType;
 
     /// Must extend a given partial solution by processing the memo.
     ///
@@ -407,7 +418,7 @@ pub trait BacktrackableMemo {
     /// * `hint`
     /// The hint passed to the memo by the parent's memo.
     /// `None` will always be passed as a hint to the root node of each available tree decomposition.
-    /// This is because root nodes don't have any parents and each tree decomposition is processed independently.
+    /// This is because root nodes don't have any parents and each tree decomposition is processed independently during dynamic programming.
     /// Therefore, there's nothing to hint at in this case.
     /// * `children_nids`
     /// The IDs of all children nodes relative to the node that the memo belongs to.
