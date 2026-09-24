@@ -74,7 +74,7 @@ The default functionality of `dendroverse.rs` can be extended with the following
 
 | Feature flag | Description |
 |:------------:|-------------|
-| `integrate-petgraph` | If you work with graphs in Rust, you likely use [`petgraph`][petgraph]. In this case, if your original graph is of type `petgraph::Graph<_, _, petgraph::Undirected, usize>`, then you don't need to create a derivative type in your project and manually implement `DendroverseOgGraphInterface` for it. Instead, you can use your graph directly with `dendroverse.rs` by enabling this feature flag. |
+| `integrate-petgraph` | If you work with graphs in Rust, you likely use [`petgraph`][petgraph]. In this case, if your original graph is of type `petgraph::Graph<_, _, petgraph::Undirected, Ix>`, then you don't need to create a derivative type in your project and manually implement `DendroverseOgGraphInterface` for it. Instead, you can use your graph directly with `dendroverse.rs` by enabling this feature flag. |
 
 ## 🤓 Examples
 
