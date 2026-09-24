@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "Solve computational problems on graphs using dynamic programming over tree decompositions."
 license = "MIT"
+repository = "https://github.com/forallthereis/dendroverse"
 
 [features]
 integrate-petgraph = ["dep:petgraph"]
