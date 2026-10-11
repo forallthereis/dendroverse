@@ -100,7 +100,7 @@
 //!
 //! | Feature flag | Description |
 //! |:------------:|-------------|
-//! | `integrate-petgraph` | If you work with graphs in Rust, you likely use [`petgraph`][petgraph]. In this case, if your original graph is of type `petgraph::Graph<_, _, petgraph::Undirected, Ix>`, then you don't need to create a derivative type in your project and manually implement [`DendroverseOgGraphInterface`] for it. Instead, you can use your graph directly with `dendroverse.rs` by enabling this feature flag. |
+//! | `integrate-petgraph` | If you work with graphs in Rust, you likely use [`petgraph`][petgraph]. In this case, if your original graph is of type `petgraph::Graph<_, _, petgraph::Undirected, _>`, then you don't need to create a derivative type in your project and manually implement [`DendroverseOgGraphInterface`] for it. Instead, you can use your graph directly with `dendroverse.rs` by enabling this feature flag. |
 //!
 //! ## 🤓 Examples
 //!
@@ -370,6 +370,18 @@ where
     /// at the beginning of each payload.
     pub fn reset_unchecked(&mut self) {
         self.is_instance_solved = false;
+    }
+
+    /// Computes the size of the largest bag in all available tree decompositions.
+    ///
+    /// In other words, this value is the width of the tree decompositions plus one.
+    pub fn max_bag_size(&self) -> usize {
+        self
+            .dtds
+            .iter()
+            .map(|dtd| dtd.max_bag_size)
+            .max()
+            .unwrap_or(0)
     }
 
 }

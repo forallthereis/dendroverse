@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, sync::{Arc, Mutex}};
 
-use arboretum_td::{graph::MutableGraph, solver::AtomSolver};
+use arboretum_td::{graph::MutableGraph};
 use fxhash::FxHashSet;
 use itertools::Itertools;
 
@@ -9,6 +9,7 @@ use itertools::Itertools;
 
 
 pub(super) struct DirectedTreeDecomposition<MemoType> {
+    pub max_bag_size: usize,
     pub root_nid: usize,
     pub adj_list: Vec<DTDNodeConnectivity>,
     pub nodes: Vec<Arc<Mutex<DTDNode<MemoType>>>>,
@@ -50,7 +51,7 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
         MemoType: Default,
     {
 
-        let mut answer = DirectedTreeDecomposition { root_nid: 0, adj_list: Vec::new(), nodes: Vec::new() };
+        let mut answer = DirectedTreeDecomposition { max_bag_size: td.max_bag_size, root_nid: 0, adj_list: Vec::new(), nodes: Vec::new() };
 
         // Assign the central node of the given tree decomposition to be the root
         // This is a ~heuristic~ that, as we hope, leads to the balanced branches of the nice tree decomposition
@@ -97,7 +98,7 @@ impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
         MemoType: Default,
     {
 
-        let mut answer = DirectedTreeDecomposition { root_nid: 0, adj_list: Vec::new(), nodes: Vec::new() };
+        let mut answer = DirectedTreeDecomposition { max_bag_size: td.max_bag_size, root_nid: 0, adj_list: Vec::new(), nodes: Vec::new() };
 
         // Assign the central node of the given tree decomposition to be the root
         // This is a ~heuristic~ that, as we hope, leads to the balanced branches of the nice tree decomposition
@@ -239,16 +240,17 @@ where
     let mut dtds = Vec::new();
     let ccs = og_graph_arboretum.connected_components();
 
-    if ccs.len() == 1 {
-        let td_generator = arboretum_td::exact::TamakiPid::with_graph(&og_graph_arboretum);
+    if ccs.len() <= 1 {
+        let td_generator = arboretum_td::solver::Solver::default_exact()
+            .seed(Some(0))
+            .safe_separator_limits(
+                arboretum_td::SafeSeparatorLimits::default().use_min_degree_for_minor_safe(true),
+            );
+        let td = td_generator.solve(&og_graph_arboretum);
         dtds.push(
-            match td_generator.compute() {
-                arboretum_td::solver::ComputationResult::Bounds(_) => return Err(anyhow::anyhow!("The automatic generation of the tree decomposition failed.")),
-                arboretum_td::solver::ComputationResult::ComputedTreeDecomposition(td) =>
-                    match make_nice {
-                        true => DirectedTreeDecomposition::nice_dtd_from(td),
-                        false => DirectedTreeDecomposition::dtd_from(td),
-                    },
+            match make_nice {
+                true => DirectedTreeDecomposition::nice_dtd_from(td),
+                false => DirectedTreeDecomposition::dtd_from(td),
             }
         );
 
@@ -257,15 +259,16 @@ where
 
     for cc_vids in ccs {
         let cc = og_graph_arboretum.vertex_induced_subgraph(&cc_vids);
-        let cc_td_generator = arboretum_td::exact::TamakiPid::with_graph(&cc);
+        let cc_td_generator = arboretum_td::solver::Solver::default_exact()
+            .seed(Some(0))
+            .safe_separator_limits(
+                arboretum_td::SafeSeparatorLimits::default().use_min_degree_for_minor_safe(true),
+            );
+        let cc_td = cc_td_generator.solve(&cc);
         dtds.push(
-            match cc_td_generator.compute() {
-                arboretum_td::solver::ComputationResult::Bounds(_) => return Err(anyhow::anyhow!("The automatic generation of the tree decomposition failed.")),
-                arboretum_td::solver::ComputationResult::ComputedTreeDecomposition(td) =>
-                match make_nice {
-                    true => DirectedTreeDecomposition::nice_dtd_from(td),
-                    false => DirectedTreeDecomposition::dtd_from(td),
-                },
+            match make_nice {
+                true => DirectedTreeDecomposition::nice_dtd_from(cc_td),
+                false => DirectedTreeDecomposition::dtd_from(cc_td),
             }
         );
     }

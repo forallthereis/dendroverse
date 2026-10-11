@@ -181,6 +181,7 @@ fn disconnected_graph() {
             ::DendroverseInstance
             ::with_auto_generated_dtd(&og_graph, &og_graph)
             .unwrap();
+    assert_eq!(max_independent_set_instance.max_bag_size(), 2);
 
     max_independent_set_instance.solve_using_dtd(15).unwrap();
     let answer = max_independent_set_instance.solution().unwrap();
@@ -223,6 +224,7 @@ fn wikipedia_graph() {
             ::DendroverseInstance
             ::with_auto_generated_dtd(&og_graph, &og_graph)
             .unwrap();
+    assert_eq!(max_independent_set_instance.max_bag_size(), 4);
 
     max_independent_set_instance.solve_using_dtd(15).unwrap();
     let answer = max_independent_set_instance.solution().unwrap();
@@ -448,6 +450,7 @@ fn graph_1357() {
             ::DendroverseInstance
             ::with_auto_generated_dtd(&og_graph, &og_graph)
             .unwrap();
+    assert_eq!(max_independent_set_instance.max_bag_size(), 6);
 
     max_independent_set_instance.solve_using_dtd(15).unwrap();
     let answer = max_independent_set_instance.solution().unwrap();

@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 // Run the tests using the following command:
 //
 //      cargo test --features integrate-petgraph -- --nocapture
@@ -10,6 +8,8 @@ use std::cmp::Ordering;
 // wrapped into a custom tuple MyGraph.
 // To use this original graph as input, we manually implement dendroverse::DendroverseOgGraphInterface
 // for MyGraph.
+use std::cmp::Ordering;
+
 use dendroverse;
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
 use itertools::Itertools;
@@ -336,6 +336,7 @@ fn disconnected_graph() {
             ::DendroverseInstance
             ::with_auto_generated_nice_dtd(&og_graph, &og_graph)
             .unwrap();
+    assert_eq!(max_independent_set_instance.max_bag_size(), 2);
 
     max_independent_set_instance.solve_using_nice_dtd(15).unwrap();
     let answer = max_independent_set_instance.solution().unwrap();
@@ -378,6 +379,7 @@ fn wikipedia_graph() {
             ::DendroverseInstance
             ::with_auto_generated_nice_dtd(&og_graph, &og_graph)
             .unwrap();
+    assert_eq!(max_independent_set_instance.max_bag_size(), 4);
 
     max_independent_set_instance.solve_using_nice_dtd(15).unwrap();
     let answer = max_independent_set_instance.solution().unwrap();
@@ -604,6 +606,7 @@ fn graph_1357() {
             ::DendroverseInstance
             ::with_auto_generated_nice_dtd(&og_graph, &og_graph)
             .unwrap();
+    assert_eq!(max_independent_set_instance.max_bag_size(), 6);
 
     max_independent_set_instance.solve_using_nice_dtd(15).unwrap();
     let answer = max_independent_set_instance.solution().unwrap();
