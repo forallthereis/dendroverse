@@ -548,6 +548,9 @@ pub trait DTDMemo<AdditionalDataType> {
     ///
     /// The memo to be populated is `self`.
     /// Here, the arguments are:
+    /// * `is_root`
+    /// Indicates whether the node owning the memo is the root of a directed tree decomposition.
+    /// This is useful to filter out the entries that definitely don't represent any valid solutions.
     /// * `bag`
     /// The bag of the node owning the memo.
     /// * `children_bags`
@@ -565,6 +568,7 @@ pub trait DTDMemo<AdditionalDataType> {
     /// The order of elements in them is consistent.
     fn payload(
         &mut self,
+        is_root: bool,
         bag: &Vec<usize>,
         children_bags: Vec<&Vec<usize>>,
         children_nids: Vec<usize>,
@@ -589,6 +593,9 @@ pub trait NiceDTDMemo<AdditionalDataType> {
     ///
     /// The memo (`self`) is guaranteed to belong to a leaf node.
     /// Here, the arguments are:
+    /// * `is_root`
+    /// Indicates whether the node owning the memo is the root of a nice tree decomposition.
+    /// This is useful to filter out the entries that definitely don't represent any valid solutions.
     /// * `bag`
     /// The bag of the node owning the memo.
     /// * `additional_data`
@@ -596,6 +603,7 @@ pub trait NiceDTDMemo<AdditionalDataType> {
     /// These data can be used to validate the local feasibility of each new generated memo entry for `self`.
     fn leaf_payload(
         &mut self,
+        is_root: bool,
         bag: &Vec<usize>,
         additional_data: &AdditionalDataType,
     );
@@ -604,6 +612,9 @@ pub trait NiceDTDMemo<AdditionalDataType> {
     ///
     /// The memo (`self`) is guaranteed to belong to a forget-introduce node.
     /// Here, the arguments are:
+    /// * `is_root`
+    /// Indicates whether the node owning the memo is the root of a nice tree decomposition.
+    /// This is useful to filter out the entries that definitely don't represent any valid solutions.
     /// * `child_bag`
     /// The child node's bag.
     /// * `child_nid`
@@ -620,6 +631,7 @@ pub trait NiceDTDMemo<AdditionalDataType> {
     /// These data can be used to validate the local feasibility of each new generated memo entry for `self`.
     fn forget_introduce_payload(
         &mut self,
+        is_root: bool,
         child_bag: &Vec<usize>,
         child_nid: usize,
         child_memo: &Self,
@@ -632,6 +644,9 @@ pub trait NiceDTDMemo<AdditionalDataType> {
     ///
     /// The memo (`self`) is guaranteed to belong to a join node.
     /// Here, the arguments are:
+    /// * `is_root`
+    /// Indicates whether the node owning the memo is the root of a nice tree decomposition.
+    /// This is useful to filter out the entries that definitely don't represent any valid solutions.
     /// * `children_bag`
     /// The bag of the node owning the memo and the bag of both child nodes.
     /// * `child1_nid`
@@ -649,6 +664,7 @@ pub trait NiceDTDMemo<AdditionalDataType> {
     /// These data can be used to validate the local feasibility of each new generated memo entry for `self`.
     fn join_payload(
         &mut self,
+        is_root: bool,
         children_bag: &Vec<usize>,
         child1_nid: usize,
         child1_memo: &Self,

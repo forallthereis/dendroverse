@@ -15,6 +15,7 @@ enum DTDJob<MemoType> {
 
 struct DTDJobInfo<MemoType> {
     fullnid: (usize, usize),
+    is_root: bool,
     node: Arc<Mutex<crate::dtd::DTDNode<MemoType>>>,
     children_nids: Vec<usize>,
     childlen_nodes: Vec<Arc<Mutex<crate::dtd::DTDNode<MemoType>>>>,
@@ -33,6 +34,7 @@ enum NiceDTDJob<MemoType> {
 
 struct NiceDTDLeafJobInfo<MemoType> {
     fullnid: (usize, usize),
+    is_root: bool,
     node: Arc<Mutex<crate::dtd::DTDNode<MemoType>>>,
 }
 
@@ -40,6 +42,7 @@ struct NiceDTDLeafJobInfo<MemoType> {
 
 struct NiceDTDIntroduceForgetJobInfo<MemoType> {
     fullnid: (usize, usize),
+    is_root: bool,
     node: Arc<Mutex<crate::dtd::DTDNode<MemoType>>>,
     child_nid: usize,
     child_node: Arc<Mutex<crate::dtd::DTDNode<MemoType>>>,
@@ -51,6 +54,7 @@ struct NiceDTDIntroduceForgetJobInfo<MemoType> {
 
 struct NiceDTDJoinJobInfo<MemoType> {
     fullnid: (usize, usize),
+    is_root: bool,
     node: Arc<Mutex<crate::dtd::DTDNode<MemoType>>>,
     child1_nid: usize,
     child1_node: Arc<Mutex<crate::dtd::DTDNode<MemoType>>>,
@@ -80,11 +84,21 @@ where
     // Populate the initial available jobs queue with the leaves of the tree decompositions
     let available_jobs_queue_init: VecDeque<DTDJob<MemoType>> =
         dtds
-        .iter()
-        .enumerate()
-        .flat_map(|(dtdid, dtd)| dtd.iter_leaves().map(move |item| (dtdid, item)))
-        .map(|(dtdid, (nid, node))| DTDJob::Payload(DTDJobInfo { fullnid: (dtdid, nid), node, children_nids: vec![], childlen_nodes: vec![] }))
-        .collect();
+            .iter()
+            .enumerate()
+            .flat_map(|(dtdid, dtd)| dtd.iter_leaves().map(move |item| (dtdid, item)))
+            .map(
+                |(dtdid, (nid, node))|
+                DTDJob::Payload(DTDJobInfo {
+                    fullnid: (dtdid, nid),
+                    is_root: unsafe{ dtds.get_unchecked(dtdid) }.root_nid == nid,
+                    node,
+                    children_nids: vec![],
+                    childlen_nodes: vec![]
+                }
+                )
+            )
+            .collect();
     let available_jobs = Arc::new(
         AvailableJobs {
             jobs_queue: Mutex::new(available_jobs_queue_init),
@@ -132,6 +146,8 @@ where
                 continue;
             }
 
+            let is_root = unsafe { dtds.get_unchecked(dtdid) }.root_nid == parent_nid;
+
             available_jobs
                 .jobs_queue
                 .lock()
@@ -141,6 +157,7 @@ where
                 DTDJob::Payload(
                     DTDJobInfo {
                         fullnid: (dtdid, parent_nid),
+                        is_root,
                         node: Arc::clone(unsafe{ dtds.get_unchecked(dtdid).nodes.get_unchecked(parent_nid) }),
                         children_nids: parent_children_nids.clone(),
                         childlen_nodes: parent_children_nids.iter().map(|nid| Arc::clone(unsafe{ dtds.get_unchecked(dtdid).nodes.get_unchecked(*nid) })).collect(),
@@ -197,6 +214,7 @@ where
 
             DTDJob::Payload(job_info) => {
 
+                let is_root = job_info.is_root;
                 let mut node = job_info.node.lock().unwrap();
                 let crate::dtd::DTDNode::<MemoType> { bag: node_bag, memo: node_memo } = &mut *node;
                 let mut children_nodes = Vec::with_capacity(job_info.childlen_nodes.len());
@@ -207,6 +225,7 @@ where
                 let children_memos = children_nodes.iter().map(|node| &node.memo).collect();
 
                 node_memo.payload(
+                    is_root,
                     &node_bag,
                     children_bags,
                     job_info.children_nids,
@@ -248,6 +267,7 @@ where
         while !node_queue.is_empty() {
 
             let (nid, node) = node_queue.pop_front().unwrap();
+            let is_root = dtd.root_nid == nid;
             let mut node = node.lock().unwrap();
             let crate::dtd::DTDNode::<MemoType> { bag: node_bag, memo: node_memo } = &mut *node;
             let children_nids = unsafe { dtd.adj_list.get_unchecked(nid) }.children_nids.clone();
@@ -260,6 +280,7 @@ where
 
             // Process the node, call a payload
             node_memo.payload(
+                is_root,
                 node_bag,
                 children_bags,
                 children_nids,
@@ -302,7 +323,15 @@ where
             .iter()
             .enumerate()
             .flat_map(|(dtdid, dtd)| dtd.iter_leaves().map(move |item| (dtdid, item)))
-            .map(|(dtdid, (nid, node))| NiceDTDJob::Leaf(NiceDTDLeafJobInfo { fullnid: (dtdid, nid), node }))
+            .map(
+                |(dtdid, (nid, node))|
+                NiceDTDJob::Leaf(NiceDTDLeafJobInfo {
+                    fullnid: (dtdid, nid),
+                    is_root: unsafe { dtds.get_unchecked(dtdid) }.root_nid == nid,
+                    node
+                }
+                )
+            )
             .collect();
     let available_jobs = Arc::new(
         AvailableJobs {
@@ -355,6 +384,7 @@ where
 
                 if parent_children_nids.len() == 1 {
 
+                    let is_root = unsafe{ dtds.get_unchecked(dtdid) }.root_nid == parent_nid;
                     let node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid).nodes.get_unchecked(parent_nid) ) };
                     let child_node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid).nodes.get_unchecked(nid) ) };
 
@@ -373,6 +403,7 @@ where
                     NiceDTDJob::ForgetIntroduce(
                         NiceDTDIntroduceForgetJobInfo {
                             fullnid: (dtdid, parent_nid),
+                            is_root,
                             node,
                             child_nid: * unsafe { parent_children_nids.get_unchecked(0) },
                             child_node,
@@ -383,6 +414,7 @@ where
 
                 } else {
 
+                    let is_root = unsafe{ dtds.get_unchecked(dtdid) }.root_nid == parent_nid;
                     let node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid).nodes.get_unchecked(parent_nid) ) };
                     let child1_node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid).nodes.get_unchecked(*parent_children_nids.get_unchecked(0)) ) };
                     let child2_node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid).nodes.get_unchecked(*parent_children_nids.get_unchecked(1)) ) };
@@ -390,6 +422,7 @@ where
                     NiceDTDJob::Join(
                         NiceDTDJoinJobInfo {
                             fullnid: (dtdid, parent_nid),
+                            is_root,
                             node,
                             child1_nid: * unsafe { parent_children_nids.get_unchecked(0) },
                             child1_node,
@@ -450,10 +483,11 @@ where
 
             NiceDTDJob::Leaf(job_info) => {
 
+                let is_root = job_info.is_root;
                 let mut node = job_info.node.lock().unwrap();
                 let crate::dtd::DTDNode::<MemoType> { bag: node_bag, memo: node_memo } = &mut *node;
 
-                node_memo.leaf_payload(node_bag, additional_data);
+                node_memo.leaf_payload(is_root, node_bag, additional_data);
 
                 completed_jobs_tx.send(job_info.fullnid).unwrap();
 
@@ -461,10 +495,12 @@ where
 
             NiceDTDJob::ForgetIntroduce(job_info) => {
 
+                let is_root = job_info.is_root;
                 let mut node = job_info.node.lock().unwrap();
                 let child_node = job_info.child_node.lock().unwrap();
 
                 node.memo.forget_introduce_payload(
+                    is_root,
                     &child_node.bag,
                     job_info.child_nid,
                     &child_node.memo,
@@ -479,11 +515,13 @@ where
 
             NiceDTDJob::Join(job_info) => {
 
+                let is_root = job_info.is_root;
                 let mut node = job_info.node.lock().unwrap();
                 let child_node1 = job_info.child1_node.lock().unwrap();
                 let child_node2 = job_info.child2_node.lock().unwrap();
 
                 node.memo.join_payload(
+                    is_root,
                     &child_node1.bag,
                     job_info.child1_nid,
                     &child_node1.memo,
@@ -522,6 +560,7 @@ where
         while !node_queue.is_empty() {
 
             let (nid, node) = node_queue.pop_front().unwrap();
+            let is_root = dtd.root_nid == nid;
             let mut node = node.lock().unwrap();
             let children_nids = & unsafe { dtd.adj_list.get_unchecked(nid) }.children_nids;
             let parent_nid_option = unsafe { dtd.adj_list.get_unchecked(nid) }.parent_nid;
@@ -538,7 +577,7 @@ where
 
                     let crate::dtd::DTDNode::<MemoType> { bag: node_bag, memo: node_memo } = &mut *node;
 
-                    node_memo.leaf_payload(node_bag, additional_data);
+                    node_memo.leaf_payload(is_root, node_bag, additional_data);
 
                 },
 
@@ -551,6 +590,7 @@ where
                     let introduced_vids = node.bag.iter().filter(|vid| !child_node.bag.contains(vid)).cloned().collect();
 
                     node.memo.forget_introduce_payload(
+                        is_root,
                         &child_node.bag,
                         child_nid,
                         &child_node.memo,
@@ -569,6 +609,7 @@ where
                     let child2_node = unsafe { dtd.nodes.get_unchecked(child2_nid) }.lock().unwrap();
 
                     node.memo.join_payload(
+                        is_root,
                         &child1_node.bag,
                         child1_nid,
                         &child1_node.memo,

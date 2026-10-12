@@ -72,6 +72,7 @@ impl dendroverse::NiceDTDMemo<MyGraph> for MaxIndependentSetMemo {
 
     fn leaf_payload(
         &mut self,
+        _is_root: bool,
         bag: &Vec<usize>,
         additional_data: &MyGraph,
     )
@@ -88,6 +89,7 @@ impl dendroverse::NiceDTDMemo<MyGraph> for MaxIndependentSetMemo {
 
     fn forget_introduce_payload(
         &mut self,
+        _is_root: bool,
         _child_bag: &Vec<usize>,
         _child_nid: usize,
         child_memo: &Self,
@@ -145,6 +147,7 @@ impl dendroverse::NiceDTDMemo<MyGraph> for MaxIndependentSetMemo {
 
     fn join_payload(
         &mut self,
+        _is_root: bool,
         _children_bag: &Vec<usize>,
         child1_nid: usize,
         child1_memo: &Self,

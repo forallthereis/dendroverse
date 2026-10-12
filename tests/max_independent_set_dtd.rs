@@ -35,6 +35,7 @@ impl dendroverse::DTDMemo<MyGraph> for MaxIndependentSetMemo {
 
     fn payload(
         &mut self,
+        _is_root: bool,
         bag: &Vec<usize>,
         children_bags: Vec<&Vec<usize>>,
         children_nids: Vec<usize>,
