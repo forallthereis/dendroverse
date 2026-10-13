@@ -223,6 +223,7 @@ impl<'a, MemoType> Iterator for DTDLeafIter<'a, MemoType> {
 pub(super) fn auto_generate_dtds<MemoType, OgGraphType>(
     og_graph: &OgGraphType,
     make_nice: bool,
+    strategy: crate::DTDGenerationStrategy,
 ) -> anyhow::Result<Vec<DirectedTreeDecomposition<MemoType>>>
 where
     MemoType: Default,
@@ -241,11 +242,23 @@ where
     let ccs = og_graph_arboretum.connected_components();
 
     if ccs.len() <= 1 {
-        let td_generator = arboretum_td::solver::Solver::auto(&og_graph_arboretum)
-            .seed(Some(0))
-            .safe_separator_limits(
-                arboretum_td::SafeSeparatorLimits::default().use_min_degree_for_minor_safe(true),
-            );
+        let td_generator = match strategy {
+            crate::DTDGenerationStrategy::Auto => arboretum_td::solver::Solver::auto(&og_graph_arboretum)
+                .seed(Some(0))
+                .safe_separator_limits(
+                    arboretum_td::SafeSeparatorLimits::default().use_min_degree_for_minor_safe(true),
+                ),
+            crate::DTDGenerationStrategy::Exact => arboretum_td::solver::Solver::default_exact()
+                .seed(Some(0))
+                .safe_separator_limits(
+                    arboretum_td::SafeSeparatorLimits::default().use_min_degree_for_minor_safe(true),
+                ),
+            crate::DTDGenerationStrategy::Heuristic => arboretum_td::solver::Solver::default_heuristic()
+                .safe_separator_limits(
+                    arboretum_td::SafeSeparatorLimits::default().use_min_degree_for_minor_safe(true),
+                )
+                .seed(Some(0)),
+        };
         let td = td_generator.solve(&og_graph_arboretum);
         dtds.push(
             match make_nice {
@@ -259,11 +272,23 @@ where
 
     for cc_vids in ccs {
         let cc = og_graph_arboretum.vertex_induced_subgraph(&cc_vids);
-        let cc_td_generator = arboretum_td::solver::Solver::auto(&cc)
-            .seed(Some(0))
-            .safe_separator_limits(
-                arboretum_td::SafeSeparatorLimits::default().use_min_degree_for_minor_safe(true),
-            );
+        let cc_td_generator = match strategy {
+            crate::DTDGenerationStrategy::Auto => arboretum_td::solver::Solver::auto(&cc)
+                .seed(Some(0))
+                .safe_separator_limits(
+                    arboretum_td::SafeSeparatorLimits::default().use_min_degree_for_minor_safe(true),
+                ),
+            crate::DTDGenerationStrategy::Exact => arboretum_td::solver::Solver::default_exact()
+                .seed(Some(0))
+                .safe_separator_limits(
+                    arboretum_td::SafeSeparatorLimits::default().use_min_degree_for_minor_safe(true),
+                ),
+            crate::DTDGenerationStrategy::Heuristic => arboretum_td::solver::Solver::default_heuristic()
+                .safe_separator_limits(
+                    arboretum_td::SafeSeparatorLimits::default().use_min_degree_for_minor_safe(true),
+                )
+                .seed(Some(0)),
+        };
         let cc_td = cc_td_generator.solve(&cc);
         dtds.push(
             match make_nice {

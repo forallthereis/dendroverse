@@ -337,7 +337,7 @@ fn disconnected_graph() {
     let mut max_independent_set_instance: dendroverse::DendroverseInstance<MaxIndependentSetMemo, MyGraph> =
         dendroverse
             ::DendroverseInstance
-            ::with_auto_generated_nice_dtd(&og_graph, &og_graph)
+            ::with_auto_generated_nice_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationStrategy::Exact)
             .unwrap();
     assert_eq!(max_independent_set_instance.max_bag_size(), 2);
 
@@ -380,7 +380,7 @@ fn wikipedia_graph() {
     let mut max_independent_set_instance: dendroverse::DendroverseInstance<MaxIndependentSetMemo, MyGraph> =
         dendroverse
             ::DendroverseInstance
-            ::with_auto_generated_nice_dtd(&og_graph, &og_graph)
+            ::with_auto_generated_nice_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationStrategy::Exact)
             .unwrap();
     assert_eq!(max_independent_set_instance.max_bag_size(), 4);
 
@@ -607,7 +607,7 @@ fn graph_1357() {
     let mut max_independent_set_instance: dendroverse::DendroverseInstance<MaxIndependentSetMemo, MyGraph> =
         dendroverse
             ::DendroverseInstance
-            ::with_auto_generated_nice_dtd(&og_graph, &og_graph)
+            ::with_auto_generated_nice_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationStrategy::Exact)
             .unwrap();
     assert_eq!(max_independent_set_instance.max_bag_size(), 6);
 

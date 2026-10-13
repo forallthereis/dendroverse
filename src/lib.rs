@@ -201,6 +201,9 @@ where
     /// * `additional_data`
     /// Data that can be immutably accessed from a node payload function during the solution process to check the local feasibility of
     /// the newly constructed memo entries.
+    /// * `strategy`
+    /// A selector of an algorithm to be used for the tree decomposition computation.
+    /// See the documentation for [`DTDGenerationStrategy`] for more detail.
     ///
     /// Note that a separate tree decomposition will be generated for each connected component of `og_graph`.
     /// If multi-threaded dynamic programming is later used to solve the instance, the nodes from all the tree decompositions will be processed concurrently.
@@ -217,12 +220,13 @@ where
     pub fn with_auto_generated_dtd<OgGraphType>(
         og_graph: &'a OgGraphType,
         additional_data: &'a AdditionalDataType,
+        strategy: DTDGenerationStrategy,
     ) -> anyhow::Result<Self>
     where
         OgGraphType: DendroverseOgGraphInterface,
         MemoType: Default + DTDMemo<AdditionalDataType>,
     {
-        Ok(DendroverseInstance { dtds: dtd::auto_generate_dtds(og_graph, false)?, additional_data, is_instance_solved: false })
+        Ok(DendroverseInstance { dtds: dtd::auto_generate_dtds(og_graph, false, strategy)?, additional_data, is_instance_solved: false })
     }
 
     /// Creates a new `DendroverseInstance` with automatically generated nice tree decompositions for the given original graph.
@@ -233,6 +237,9 @@ where
     /// * `additional_data`
     /// Data that can be immutably accessed from a node payload function during the solution process to check the local feasibility of
     /// the newly constructed memo entries.
+    /// * `strategy`
+    /// A selector of an algorithm to be used for the tree decomposition computation.
+    /// See the documentation for [`DTDGenerationStrategy`] for more detail.
     ///
     /// Note that a separate nice tree decomposition will be generated for each connected component of `og_graph`.
     /// If multi-threaded dynamic programming is later used to solve the instance, the nodes from all the tree decompositions will be processed concurrently.
@@ -247,12 +254,13 @@ where
     pub fn with_auto_generated_nice_dtd<OgGraphType>(
         og_graph: &'a OgGraphType,
         additional_data: &'a AdditionalDataType,
+        strategy: DTDGenerationStrategy,
     ) -> anyhow::Result<Self>
     where
         OgGraphType: DendroverseOgGraphInterface,
         MemoType: Default + NiceDTDMemo<AdditionalDataType>,
     {
-        Ok(DendroverseInstance { dtds: dtd::auto_generate_dtds(og_graph, true)?, additional_data, is_instance_solved: false })
+        Ok(DendroverseInstance { dtds: dtd::auto_generate_dtds(og_graph, true, strategy)?, additional_data, is_instance_solved: false })
     }
 
     /// Solves the `DendroverseInstance` using dynamic programming over arbitrary directed tree decompositions.
@@ -384,6 +392,23 @@ where
             .unwrap_or(0)
     }
 
+}
+
+
+
+/// # Algorithm to use for automatic tree decomposition
+///
+/// See the documentation for [`DendroverseInstance`] for use cases.
+pub enum DTDGenerationStrategy {
+    /// An algorithm will be chosen automatically depending on the number of vertices in the graph.
+    /// An exact algorithm (Tamaki's PID) will only be used for small graphs, bigger graphs will be processed
+    /// with a tabu-search-based heuristic.
+    /// Graphs with more than 50,000 vertices will be processed without any safe reduction rules.
+    Auto,
+    /// An exact algorithm (Tamaki's PID) will be used together with safe reduction rules.
+    Exact,
+    /// A tabu-search-based heuristic will be used together with safe reduction rules.
+    Heuristic,
 }
 
 
