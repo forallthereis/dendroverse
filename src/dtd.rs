@@ -241,7 +241,7 @@ where
     let ccs = og_graph_arboretum.connected_components();
 
     if ccs.len() <= 1 {
-        let td_generator = arboretum_td::solver::Solver::default_exact()
+        let td_generator = arboretum_td::solver::Solver::auto(&og_graph_arboretum)
             .seed(Some(0))
             .safe_separator_limits(
                 arboretum_td::SafeSeparatorLimits::default().use_min_degree_for_minor_safe(true),
@@ -259,7 +259,7 @@ where
 
     for cc_vids in ccs {
         let cc = og_graph_arboretum.vertex_induced_subgraph(&cc_vids);
-        let cc_td_generator = arboretum_td::solver::Solver::default_exact()
+        let cc_td_generator = arboretum_td::solver::Solver::auto(&cc)
             .seed(Some(0))
             .safe_separator_limits(
                 arboretum_td::SafeSeparatorLimits::default().use_min_degree_for_minor_safe(true),
