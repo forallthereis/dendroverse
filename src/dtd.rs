@@ -465,7 +465,7 @@ where
 
         let cc_td = match algo {
             crate::DTDGenerationAlgorithm::GoatdPortfolio => {
-                let weights = vec![1; og_graph_goatd.num_vertices() as usize];
+                let weights = vec![1; cc.num_vertices() as usize];
                 goatd::portfolio::decompose(&cc, &weights, 0, goatd::portfolio::PortfolioConfig::standard())?
             },
             _ => unreachable!(),
@@ -506,12 +506,16 @@ fn connected_components_goatd(td: &goatd::Graph) -> Vec<Vec<u32>> {
         while let Some(vid) = stack.pop() {
             component.push(vid);
 
-            for (_, adj_vid) in td.edges().iter().filter(|(vid1, _)| *vid1 == vid) {
-                let adj_vid_usize = *adj_vid as usize;
+            for adj_vid in td
+                .edges()
+                .iter()
+                .filter_map(|(vid1, vid2)| if *vid1 == vid { Some(*vid2) } else if *vid2 == vid { Some(*vid1) } else { None })
+            {
+                let adj_vid_usize = adj_vid as usize;
 
                 if !visited[adj_vid_usize] {
                     visited[adj_vid_usize] = true;
-                    stack.push(*adj_vid);
+                    stack.push(adj_vid);
                 }
             }
         }
