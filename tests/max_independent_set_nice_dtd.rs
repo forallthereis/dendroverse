@@ -1,6 +1,6 @@
 // Run the tests using the following command:
 //
-//      cargo test --features integrate-petgraph -- --nocapture
+//      cargo test --features engine-arboretum integrate-petgraph -- --nocapture
 //
 // This test solves the problem of finding a maximum independent set in a graph
 // using dynamic programming over nice tree decompositions.
@@ -21,6 +21,7 @@ use crate::MaxIndependentSetMemoAncestorEntryId::{NoAncestor, SingleAncestor, Tw
 
 
 
+#[allow(unused)]
 struct MyGraph(Graph<(), (), Undirected, usize>);
 
 impl dendroverse::DendroverseOgGraphInterface for MyGraph {
@@ -35,6 +36,7 @@ impl dendroverse::DendroverseOgGraphInterface for MyGraph {
 
 
 
+#[allow(unused)]
 #[derive(Clone, Copy, Debug)]
 enum MaxIndependentSetMemoAncestorEntryId {
     NoAncestor,
@@ -54,6 +56,7 @@ impl Default for MaxIndependentSetMemoAncestorEntryId {
 
 
 
+#[allow(unused)]
 #[derive(Clone, Debug, Default)]
 struct MaxIndependentSetMemoEntry {
     indep_set: Vec<usize>,
@@ -63,6 +66,7 @@ struct MaxIndependentSetMemoEntry {
 
 
 
+#[allow(unused)]
 #[derive(Debug, Default)]
 struct MaxIndependentSetMemo(Vec<MaxIndependentSetMemoEntry>);
 
@@ -245,6 +249,7 @@ impl dendroverse::BacktrackableMemo for MaxIndependentSetMemo {
 
 
 
+#[allow(unused)]
 fn is_independent(vertex_set: &Vec<&usize>, og_graph: &MyGraph) -> bool {
     for i in 0..vertex_set.len() {
         for j in (i + 1)..vertex_set.len() {
@@ -258,6 +263,7 @@ fn is_independent(vertex_set: &Vec<&usize>, og_graph: &MyGraph) -> bool {
 
 
 
+#[allow(unused)]
 fn is_independent_with_added(
     indep_vertex_set: &Vec<usize>,
     added_vertex_set: &Vec<&usize>,
@@ -282,6 +288,7 @@ fn is_independent_with_added(
 
 
 
+#[allow(unused)]
 fn subtract_sorted_vecs(minuend: &Vec<usize>, subtrahend: &Vec<usize>) -> Vec<usize> {
 
     let mut answer = Vec::with_capacity(minuend.len());
@@ -326,6 +333,7 @@ fn subtract_sorted_vecs(minuend: &Vec<usize>, subtrahend: &Vec<usize>) -> Vec<us
 
 
 #[test]
+#[cfg(feature = "engine-arboretum")]
 fn disconnected_graph() {
 
     let og_graph: Graph<(), (), Undirected, usize> = Graph::from_edges([
@@ -337,7 +345,7 @@ fn disconnected_graph() {
     let mut max_independent_set_instance: dendroverse::DendroverseInstance<MaxIndependentSetMemo, MyGraph> =
         dendroverse
             ::DendroverseInstance
-            ::with_auto_generated_nice_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationStrategy::Exact)
+            ::with_auto_generated_nice_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationAlgorithm::ArboretumExact)
             .unwrap();
     assert_eq!(max_independent_set_instance.max_bag_size(), 2);
 
@@ -356,6 +364,7 @@ fn disconnected_graph() {
 }
 
 #[test]
+#[cfg(feature = "engine-arboretum")]
 fn wikipedia_graph() {
 
     let og_graph: Graph<(), (), Undirected, usize> = Graph::from_edges([
@@ -380,7 +389,7 @@ fn wikipedia_graph() {
     let mut max_independent_set_instance: dendroverse::DendroverseInstance<MaxIndependentSetMemo, MyGraph> =
         dendroverse
             ::DendroverseInstance
-            ::with_auto_generated_nice_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationStrategy::Exact)
+            ::with_auto_generated_nice_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationAlgorithm::ArboretumExact)
             .unwrap();
     assert_eq!(max_independent_set_instance.max_bag_size(), 4);
 
@@ -399,6 +408,7 @@ fn wikipedia_graph() {
 }
 
 #[test]
+#[cfg(feature = "engine-arboretum")]
 fn graph_1357() {
 
     let og_graph: Graph<(), (), Undirected, usize> = Graph::from_edges([
@@ -607,7 +617,7 @@ fn graph_1357() {
     let mut max_independent_set_instance: dendroverse::DendroverseInstance<MaxIndependentSetMemo, MyGraph> =
         dendroverse
             ::DendroverseInstance
-            ::with_auto_generated_nice_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationStrategy::Exact)
+            ::with_auto_generated_nice_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationAlgorithm::ArboretumExact)
             .unwrap();
     assert_eq!(max_independent_set_instance.max_bag_size(), 6);
 

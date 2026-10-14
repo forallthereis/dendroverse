@@ -33,7 +33,7 @@
 //! over [tree decompositions][td_wiki].
 //!
 //! ## ✅ What this crate does for you
-//! * Generates optimal tree decompsitions (using [`arboretum_td`][arboretum] under the hood).
+//! * Generates optimal tree decompsitions using the engine of your choice.
 //! * Transforms tree decompositions into nice tree decompositions.
 //! * Implements a **multi-threaded**, dynamic-programming-based solution process that includes job orchestration for multiple threads.
 //! * Constructs a solution using backtracking.
@@ -96,11 +96,29 @@
 //!
 //! ## 🧱 Additional feature flags
 //!
-//! The default functionality of `dendroverse.rs` can be extended with the following feature flags:
+//! #### Tree decomposition engines
+//!
+//! If you want to generate tree decompositions automatically, you'll need to choose a _tree decomposition engine_ (or multiple engines)
+//! that you want `dendroverse.rs` to use.
+//! Each engine introduces a list of new dependencies, so to avoid bloating your project with them, we've disabled all of them by default.
+//! So, don't forget to opt in!
 //!
 //! | Feature flag | Description |
 //! |:------------:|-------------|
-//! | `integrate-petgraph` | If you work with graphs in Rust, you likely use [`petgraph`][petgraph]. In this case, if your original graph is of type `petgraph::Graph<_, _, petgraph::Undirected, _>`, then you don't need to create a derivative type in your project and manually implement [`DendroverseOgGraphInterface`] for it. Instead, you can use your graph directly with `dendroverse.rs` by enabling this feature flag. |
+//! | `engine-arboretum` | Enables the [`arboretum_td`][arboretum] engine. This is the only supported engine that, alongside heuristics, implements algorithms that guarantee the _optimality_ of tree decompositions, i.e. that construct tree decompositions with width = treewidth. |
+//! | `engine-goatd` | Enables the [`goatd`][goatd] engine. It implements many heuristics and has proven effective and efficient in many use cases. |
+//!
+//! #### Graph library integrations
+//!
+//! If you use a popular graph library, you might find it tiresome to implement [`DendroverseOgGraphInterface`] for them.
+//! Indeed, Rust doesn't allow traits defined outside your crate to be implemented for types defined outside your crate.
+//! Thus, if you wish to use a graph type from a third-party library with `dendroverse.rs`, you'll have to look for workarounds, e.g.
+//! declaring a wrapper type, which is ugly.
+//! For this reason, we've integrated popular graph libraries for you.
+//!
+//! | Feature flag | Description |
+//! |:------------:|-------------|
+//! | `integrate-petgraph` | Integrates [`petgraph`][petgraph]. If your original graph is of type `petgraph::Graph<_, _, petgraph::Undirected, _>`, then you don't need to create a derivative type in your project and manually implement [`DendroverseOgGraphInterface`] for it. Instead, you can use your graph directly with `dendroverse.rs` by enabling this feature flag. |
 //!
 //! ## 🤓 Examples
 //!
@@ -120,6 +138,7 @@
 //!
 //! [td_wiki]: https://en.wikipedia.org/wiki/Tree_decomposition
 //! [arboretum]: https://docs.rs/arboretum-td/latest/arboretum_td/index.html
+//! [goatd]: https://docs.rs/goatd/latest/goatd/index.html
 //! [petgraph]: https://docs.rs/petgraph/latest/petgraph/
 //! [examples]: https://github.com/forallthereis/dendroverse/tree/master/tests
 use std::collections::VecDeque;
@@ -201,9 +220,9 @@ where
     /// * `additional_data`
     /// Data that can be immutably accessed from a node payload function during the solution process to check the local feasibility of
     /// the newly constructed memo entries.
-    /// * `strategy`
+    /// * `algo`
     /// A selector of an algorithm to be used for the tree decomposition computation.
-    /// See the documentation for [`DTDGenerationStrategy`] for more detail.
+    /// See the documentation for [`DTDGenerationAlgorithm`] for more detail.
     ///
     /// Note that a separate tree decomposition will be generated for each connected component of `og_graph`.
     /// If multi-threaded dynamic programming is later used to solve the instance, the nodes from all the tree decompositions will be processed concurrently.
@@ -220,13 +239,13 @@ where
     pub fn with_auto_generated_dtd<OgGraphType>(
         og_graph: &'a OgGraphType,
         additional_data: &'a AdditionalDataType,
-        strategy: DTDGenerationStrategy,
+        algo: DTDGenerationAlgorithm,
     ) -> anyhow::Result<Self>
     where
         OgGraphType: DendroverseOgGraphInterface,
         MemoType: Default + DTDMemo<AdditionalDataType>,
     {
-        Ok(DendroverseInstance { dtds: dtd::auto_generate_dtds(og_graph, false, strategy)?, additional_data, is_instance_solved: false })
+        Ok(DendroverseInstance { dtds: dtd::auto_generate_dtds(og_graph, false, algo)?, additional_data, is_instance_solved: false })
     }
 
     /// Creates a new `DendroverseInstance` with automatically generated nice tree decompositions for the given original graph.
@@ -237,9 +256,9 @@ where
     /// * `additional_data`
     /// Data that can be immutably accessed from a node payload function during the solution process to check the local feasibility of
     /// the newly constructed memo entries.
-    /// * `strategy`
+    /// * `algo`
     /// A selector of an algorithm to be used for the tree decomposition computation.
-    /// See the documentation for [`DTDGenerationStrategy`] for more detail.
+    /// See the documentation for [`DTDGenerationAlgorithm`] for more detail.
     ///
     /// Note that a separate nice tree decomposition will be generated for each connected component of `og_graph`.
     /// If multi-threaded dynamic programming is later used to solve the instance, the nodes from all the tree decompositions will be processed concurrently.
@@ -254,13 +273,13 @@ where
     pub fn with_auto_generated_nice_dtd<OgGraphType>(
         og_graph: &'a OgGraphType,
         additional_data: &'a AdditionalDataType,
-        strategy: DTDGenerationStrategy,
+        algo: DTDGenerationAlgorithm,
     ) -> anyhow::Result<Self>
     where
         OgGraphType: DendroverseOgGraphInterface,
         MemoType: Default + NiceDTDMemo<AdditionalDataType>,
     {
-        Ok(DendroverseInstance { dtds: dtd::auto_generate_dtds(og_graph, true, strategy)?, additional_data, is_instance_solved: false })
+        Ok(DendroverseInstance { dtds: dtd::auto_generate_dtds(og_graph, true, algo)?, additional_data, is_instance_solved: false })
     }
 
     /// Solves the `DendroverseInstance` using dynamic programming over arbitrary directed tree decompositions.
@@ -396,19 +415,49 @@ where
 
 
 
-/// # Algorithm to use for automatic tree decomposition
+/// # Selector of an automatic tree decomposition engine
 ///
-/// See the documentation for [`DendroverseInstance`] for use cases.
-pub enum DTDGenerationStrategy {
+/// Note that you must enable [a tree decomposition engine][engine] in order to see the corresponding
+/// variants in this enum.
+///
+/// [engine]: crate#tree-decomposition-engines
+pub enum DTDGenerationAlgorithm {
+    /// This variant runs the [`arboretum_td`][arboretum] engine.
+    ///
     /// An algorithm will be chosen automatically depending on the number of vertices in the graph.
-    /// An exact algorithm (Tamaki's PID) will only be used for small graphs, bigger graphs will be processed
-    /// with a tabu-search-based heuristic.
-    /// Graphs with more than 50,000 vertices will be processed without any safe reduction rules.
-    Auto,
-    /// An exact algorithm (Tamaki's PID) will be used together with safe reduction rules.
-    Exact,
+    /// If the graph is small (up to 100 vertices), an exact algorithm ([`arboretum_td`][arboretum]'s
+    /// implementation of Tamaki's PID) will be used.
+    /// In other cases, different heuristics will be used instead.
+    /// All algorithms apply safe reduction rules to graphs with up to 50,000 vertices.
+    /// Note that parts of these algorithms are implemented recursively, so using them on large graphs will cause stack overflow.
+    ///
+    /// [arboretum]: https://docs.rs/arboretum-td/latest/arboretum_td/
+    #[cfg(feature = "engine-arboretum")]
+    ArboretumAuto,
+    /// This variant runs the [`arboretum_td`][arboretum] engine.
+    ///
+    /// An exact algorithm ([`arboretum_td`][arboretum]'s implementation of Tamaki's PID) will be used
+    /// together with safe reduction rules.
+    /// Note that parts of this algorithm are implemented recursively, so using them on large graphs will cause stack overflow.
+    ///
+    /// [arboretum]: https://docs.rs/arboretum-td/latest/arboretum_td/
+    #[cfg(feature = "engine-arboretum")]
+    ArboretumExact,
+    /// This variant runs the [`arboretum_td`][arboretum] engine.
+    ///
     /// A tabu-search-based heuristic will be used together with safe reduction rules.
-    Heuristic,
+    /// Note that parts of this algorithm are implemented recursively, so using them on large graphs will cause stack overflow.
+    ///
+    /// [arboretum]: https://docs.rs/arboretum-td/latest/arboretum_td/
+    #[cfg(feature = "engine-arboretum")]
+    ArboretumHeuristic,
+    /// This variant runs the [`goatd`][goatd] engine.
+    ///
+    /// Several heuristics will be run one after another in a single thread, then the best result will be picked as final.
+    ///
+    /// [goatd]: https://docs.rs/goatd/latest/goatd/index.html
+    #[cfg(feature = "engine-goatd")]
+    GoatdPortfolio,
 }
 
 

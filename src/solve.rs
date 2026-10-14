@@ -371,8 +371,8 @@ where
             let parent_nid = unsafe { dtds.get_unchecked(dtdid).adj_list.get_unchecked(nid) }.parent_nid.unwrap();
             let parent_children_nids = & unsafe { dtds.get_unchecked(dtdid).adj_list.get_unchecked(parent_nid) }.children_nids;
 
-            if parent_children_nids.len() == 2 && !one_child_processed_join_nids.contains(&parent_nid) {
-                one_child_processed_join_nids.insert(parent_nid);
+            if parent_children_nids.len() == 2 && !one_child_processed_join_nids.contains(&(dtdid, parent_nid)) {
+                one_child_processed_join_nids.insert((dtdid, parent_nid));
                 continue;
             }
 

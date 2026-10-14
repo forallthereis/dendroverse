@@ -1,6 +1,6 @@
 // Run the tests using the following command:
 //
-//      cargo test --features integrate-petgraph -- --nocapture
+//      cargo test --features engine-arboretum integrate-petgraph -- --nocapture
 //
 // This test solves the problem of finding THE CARDINALITY of a maximum independent set in a graph
 // using dynamic programming over arbitrary directed tree decompositions.
@@ -169,7 +169,7 @@ fn intersect_sorted_vecs(vec1: &Vec<&usize>, vec2: &Vec<usize>) -> Vec<usize> {
 
 
 #[test]
-#[cfg(feature = "integrate-petgraph")]
+#[cfg(all(feature = "integrate-petgraph", feature = "engine-arboretum"))]
 fn disconnected_graph() {
 
     let og_graph: MyGraph = Graph::from_edges([
@@ -180,7 +180,7 @@ fn disconnected_graph() {
     let mut max_independent_set_instance: dendroverse::DendroverseInstance<MaxIndependentSetMemo, MyGraph> =
         dendroverse
             ::DendroverseInstance
-            ::with_auto_generated_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationStrategy::Exact)
+            ::with_auto_generated_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationAlgorithm::ArboretumExact)
             .unwrap();
     assert_eq!(max_independent_set_instance.max_bag_size(), 2);
 
@@ -199,7 +199,7 @@ fn disconnected_graph() {
 }
 
 #[test]
-#[cfg(feature = "integrate-petgraph")]
+#[cfg(all(feature = "integrate-petgraph", feature = "engine-arboretum"))]
 fn wikipedia_graph() {
 
     let og_graph: MyGraph = Graph::from_edges([
@@ -223,7 +223,7 @@ fn wikipedia_graph() {
     let mut max_independent_set_instance: dendroverse::DendroverseInstance<MaxIndependentSetMemo, MyGraph> =
         dendroverse
             ::DendroverseInstance
-            ::with_auto_generated_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationStrategy::Exact)
+            ::with_auto_generated_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationAlgorithm::ArboretumExact)
             .unwrap();
     assert_eq!(max_independent_set_instance.max_bag_size(), 4);
 
@@ -242,7 +242,7 @@ fn wikipedia_graph() {
 }
 
 #[test]
-#[cfg(feature = "integrate-petgraph")]
+#[cfg(all(feature = "integrate-petgraph", feature = "engine-arboretum"))]
 fn graph_1357() {
 
     let og_graph: MyGraph = Graph::from_edges([
@@ -449,7 +449,7 @@ fn graph_1357() {
     let mut max_independent_set_instance: dendroverse::DendroverseInstance<MaxIndependentSetMemo, MyGraph> =
         dendroverse
             ::DendroverseInstance
-            ::with_auto_generated_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationStrategy::Exact)
+            ::with_auto_generated_dtd(&og_graph, &og_graph, dendroverse::DTDGenerationAlgorithm::ArboretumExact)
             .unwrap();
     assert_eq!(max_independent_set_instance.max_bag_size(), 6);
 
