@@ -80,7 +80,6 @@ where
     MemoType: Send + Sync + crate::DTDMemo<AdditionalDataType>,
     AdditionalDataType: Sync,
 {
-
     // Populate the initial available jobs queue with the leaves of the tree decompositions
     let available_jobs_queue_init: VecDeque<DTDJob<MemoType>> =
         dtds
@@ -120,14 +119,12 @@ where
 
     // Spawn worker threads
     thread::scope(|s| -> anyhow::Result<()> {
-
         for _ in 0..threads_count {
             s.spawn(|| { dtd_worker_thread(Arc::clone(&available_jobs), completed_jobs_tx.clone(), additional_data); });
         }
 
         // Track the reports about completed jobs
         loop {
-
             let (dtdid, nid) = completed_jobs_rx.recv()?;
 
             if nid == unsafe { dtds.get_unchecked(dtdid) }.root_nid {
@@ -167,7 +164,6 @@ where
             );
 
             available_jobs.not_empty_anymore.notify_one();
-
         }
 
         // Kill the worker threads
@@ -182,9 +178,7 @@ where
         }
 
         Ok(())
-
     })
-
 }
 
 
@@ -197,9 +191,7 @@ fn dtd_worker_thread<MemoType, AdditionalDataType>(
 where
     MemoType: crate::DTDMemo<AdditionalDataType>,
 {
-
     loop {
-
         let mut available_jobs_queue = available_jobs.jobs_queue.lock().unwrap();
 
         while available_jobs_queue.is_empty() {
@@ -211,9 +203,7 @@ where
         drop(available_jobs_queue);
 
         match job {
-
             DTDJob::Payload(job_info) => {
-
                 let is_root = job_info.is_root;
                 let mut node = job_info.node.lock().unwrap();
                 let crate::dtd::DTDNode::<MemoType> { bag: node_bag, memo: node_memo } = &mut *node;
@@ -234,15 +224,11 @@ where
                 );
 
                 completed_jobs_tx.send(job_info.fullnid).unwrap();
-
             },
 
             DTDJob::Terminate => break,
-
         }
-
     }
-
 }
 
 
@@ -254,9 +240,7 @@ pub(super) fn solve_using_dtd_singlethread<MemoType, AdditionalDataType>(
 where
     MemoType: crate::DTDMemo<AdditionalDataType>,
 {
-
     for (dtdid, dtd) in dtds.iter().enumerate() {
-
         let mut node_queue = VecDeque::from_iter(dtd.iter_leaves());
         let mut unprocessed_children_count = FxHashMap::from_iter(
             (0..dtds.len())
@@ -265,7 +249,6 @@ where
         );
 
         while !node_queue.is_empty() {
-
             let (nid, node) = node_queue.pop_front().unwrap();
             let is_root = dtd.root_nid == nid;
             let mut node = node.lock().unwrap();
@@ -296,13 +279,10 @@ where
                     *unprocessed_children_count.get_mut(&(dtdid, parent_nid)).unwrap() -= 1;
                 }
             }
-
         }
-
     }
 
     Ok(())
-
 }
 
 
@@ -316,7 +296,6 @@ where
     MemoType: Send + Sync + crate::NiceDTDMemo<AdditionalDataType>,
     AdditionalDataType: Sync,
 {
-
     // Populate the initial available jobs queue with the leaves of the tree decompositions
     let available_jobs_queue_init: VecDeque<NiceDTDJob<MemoType>> =
         dtds
@@ -350,14 +329,12 @@ where
 
     // Spawn worker threads
     thread::scope(|s| -> anyhow::Result<()> {
-
         for _ in 0..threads_count {
             s.spawn(|| { nice_dtd_worker_thread(Arc::clone(&available_jobs), completed_jobs_tx.clone(), additional_data) });
         }
 
         // Track the reports about completed jobs
         loop {
-
             let (dtdid, nid) = completed_jobs_rx.recv()?;
 
             if nid == unsafe { dtds.get_unchecked(dtdid) }.root_nid {
@@ -383,7 +360,6 @@ where
                 .push_back(
 
                 if parent_children_nids.len() == 1 {
-
                     let is_root = unsafe{ dtds.get_unchecked(dtdid) }.root_nid == parent_nid;
                     let node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid).nodes.get_unchecked(parent_nid) ) };
                     let child_node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid).nodes.get_unchecked(nid) ) };
@@ -411,9 +387,7 @@ where
                             introduced_vids,
                         }
                     )
-
                 } else {
-
                     let is_root = unsafe{ dtds.get_unchecked(dtdid) }.root_nid == parent_nid;
                     let node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid).nodes.get_unchecked(parent_nid) ) };
                     let child1_node = unsafe { Arc::clone( &dtds.get_unchecked(dtdid).nodes.get_unchecked(*parent_children_nids.get_unchecked(0)) ) };
@@ -430,13 +404,10 @@ where
                             child2_node,
                         }
                     )
-
                 }
-
             );
 
             available_jobs.not_empty_anymore.notify_one();
-
         }
 
         // Kill the worker threads
@@ -451,9 +422,7 @@ where
         }
 
         Ok(())
-
     })
-
 }
 
 
@@ -466,9 +435,7 @@ fn nice_dtd_worker_thread<MemoType, AdditionalDataType>(
 where
     MemoType: crate::NiceDTDMemo<AdditionalDataType>,
 {
-
     loop {
-
         let mut available_jobs_queue = available_jobs.jobs_queue.lock().unwrap();
 
         while available_jobs_queue.is_empty() {
@@ -480,9 +447,7 @@ where
         drop(available_jobs_queue);
 
         match job {
-
             NiceDTDJob::Leaf(job_info) => {
-
                 let is_root = job_info.is_root;
                 let mut node = job_info.node.lock().unwrap();
                 let crate::dtd::DTDNode::<MemoType> { bag: node_bag, memo: node_memo } = &mut *node;
@@ -490,11 +455,9 @@ where
                 node_memo.leaf_payload(is_root, node_bag, additional_data);
 
                 completed_jobs_tx.send(job_info.fullnid).unwrap();
-
             },
 
             NiceDTDJob::ForgetIntroduce(job_info) => {
-
                 let is_root = job_info.is_root;
                 let mut node = job_info.node.lock().unwrap();
                 let child_node = job_info.child_node.lock().unwrap();
@@ -510,11 +473,9 @@ where
                 );
 
                 completed_jobs_tx.send(job_info.fullnid).unwrap();
-
             },
 
             NiceDTDJob::Join(job_info) => {
-
                 let is_root = job_info.is_root;
                 let mut node = job_info.node.lock().unwrap();
                 let child_node1 = job_info.child1_node.lock().unwrap();
@@ -531,15 +492,11 @@ where
                 );
 
                 completed_jobs_tx.send(job_info.fullnid).unwrap();
-
             },
 
             NiceDTDJob::Terminate => break,
-
         }
-
     }
-
 }
 
 
@@ -551,14 +508,11 @@ pub(super) fn solve_using_nice_dtd_singlethread<MemoType, AdditionalDataType>(
 where
     MemoType: crate::NiceDTDMemo<AdditionalDataType>,
 {
-
     for dtd in dtds {
-
         let mut node_queue = VecDeque::from_iter(dtd.iter_leaves());
         let mut one_child_processed_join_nids = FxHashSet::with_hasher(FxBuildHasher::new());
 
         while !node_queue.is_empty() {
-
             let (nid, node) = node_queue.pop_front().unwrap();
             let is_root = dtd.root_nid == nid;
             let mut node = node.lock().unwrap();
@@ -572,17 +526,13 @@ where
 
             // Process the node, call payloads
             match children_nids.len() {
-
                 0 => {
-
                     let crate::dtd::DTDNode::<MemoType> { bag: node_bag, memo: node_memo } = &mut *node;
 
                     node_memo.leaf_payload(is_root, node_bag, additional_data);
-
                 },
 
                 1 => {
-
                     let child_nid = unsafe { *children_nids.get_unchecked(0) };
                     let child_node = unsafe { dtd.nodes.get_unchecked(child_nid) }.lock().unwrap();
 
@@ -598,11 +548,9 @@ where
                         &introduced_vids,
                         additional_data,
                     );
-
                 },
 
                 2 => {
-
                     let child1_nid = unsafe { *children_nids.get_unchecked(0) };
                     let child1_node = unsafe { dtd.nodes.get_unchecked(child1_nid) }.lock().unwrap();
                     let child2_nid = unsafe { *children_nids.get_unchecked(1) };
@@ -617,27 +565,20 @@ where
                         &child2_node.memo,
                         additional_data
                     );
-
                 },
 
                 _ => return Err(anyhow::anyhow!("A node with more than two children was encountered in a nice tree decomposition.")),
-
             }
 
             if let Some(parent_nid) = parent_nid_option {
-
                 if siblings_count <= 1 || one_child_processed_join_nids.contains(&parent_nid) {
                     node_queue.push_back((parent_nid, Arc::clone( unsafe { dtd.nodes.get_unchecked(parent_nid) } )));
                 } else {
                     one_child_processed_join_nids.insert(parent_nid);
                 }
-
             }
-
         }
-
     }
 
     Ok(())
-
 }

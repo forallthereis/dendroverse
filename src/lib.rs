@@ -28,7 +28,7 @@
 //! cargo add dendroverse
 //! ```
 //!
-//! ## 🤔 What is `dendroverse.rs`?
+//! ## 🤔 What is <span class="fredoka-title" style="font-size: 1.25rem;">dendroverse<span class="gradient-title">.rs</span></span>?
 //! This is a Rust crate that enables you to solve computational problems on graphs using dynamic programming
 //! over [tree decompositions][td_wiki].
 //!
@@ -43,9 +43,10 @@
 //!   ⇒ You'll have to implement payloads for each tree decomposition node yourself.
 //! * It doesn't understand how a partial solution should be extended during backtracking in order to construct an answer to the problem
 //!   ⇒ You'll have to implement the iterative partial solution expansion yourself.
-//!   The good news here is that the `dendroverse.rs` interface makes this step as easy as possible by facilitating backlinking.
+//!   The good news here is that the <span class="fredoka-title" style="font-size: 1rem;">dendroverse<span class="gradient-title">.rs</span></span>
+//!   interface makes this step as easy as possible by facilitating backlinking.
 //!
-//! ## 🔨 Four steps to use `dendroverse.rs`
+//! ## 🔨 Four steps to use <span class="fredoka-title" style="font-size: 1.25rem;">dendroverse<span class="gradient-title">.rs</span></span>
 //!
 //! #### 1. Design a dynamic programming algorithm
 //! First and foremost, you should design an algorithm to solve your specific problem using dynamic programming over tree decompositions.
@@ -56,7 +57,8 @@
 //! In our generic code, we use the name `MemoType` to refer to the specific type of **memo** you use.
 //! Each tree decomposition node contains a memo, which is a data structure used to store records associated with the node.
 //! Memos are sometimes also called **DP-tables**.
-//! When using `dendroverse.rs`, it's your responsibility to implement a custom type (typically a struct) to be used as a memo.
+//! When using <span class="fredoka-title" style="font-size: 1rem;">dendroverse<span class="gradient-title">.rs</span></span>,
+//! it's your responsibility to implement a custom type (typically a struct) to be used as a memo.
 //!
 //! #### 3. Implement necessary traits
 //! You'll have to implement the necessary payloads for the tree decomposition nodes yourself.
@@ -65,6 +67,9 @@
 //! * Implement [`DTDMemo`] for your `MemoType` if your algorithm works with arbitrary tree decompositions.
 //! * Implement [`NiceDTDMemo`] for your `MemoType` if your algorithm requires nice tree decompositions.
 //! * Implement [`BacktrackableMemo`] for your `MemoType` if you want to retrieve solutions after having your problem instance solved.
+//!
+//! Furthermore, if you want to automatically generate tree decompositions for your graphs, make sure you implement
+//! [`DendroverseOgGraphInterface`] for your graph type.
 //!
 //! #### 4. Create and solve a [`DendroverseInstance`]
 //! When everything's set up, you can finally create and solve a [`DendroverseInstance`].
@@ -78,10 +83,12 @@
 //! Sometimes the root node or the leaf nodes are required to have empty bags.
 //! However, these definitions were originally designed to facilitate the **theoretical description** of an algorithm rather than its practical implementation.
 //!
-//! For this reason, `dendroverse.rs` uses a more relaxed definition of a nice tree decomposition, which is intended to improve the empirical runtime.
+//! For this reason, <span class="fredoka-title" style="font-size: 1rem;">dendroverse<span class="gradient-title">.rs</span></span> uses a more
+//! relaxed definition of a nice tree decomposition, which is intended to improve the empirical runtime.
 //! Specifically, a **nice tree decomposition** is understood to be a directed tree decompsition whose nodes are divided into three categories:
 //! * **Leaf nodes.**
 //! Nodes with no children.
+//! Their bags aren't necessarily empty.
 //! * **Forget-introduce nodes.**
 //! Forget and introduce nodes are merged into one category.
 //! Similar to the classical nice tree decompositions, these nodes have exactly one child.
@@ -98,38 +105,42 @@
 //!
 //! #### Tree decomposition engines
 //!
-//! If you want to generate tree decompositions automatically, you'll need to choose a _tree decomposition engine_ (or multiple engines)
-//! that you want `dendroverse.rs` to use.
-//! Each engine introduces a list of new dependencies, so to avoid bloating your project with them, we've disabled all of them by default.
+//! To generate tree decompositions automatically, you need to select the _tree decomposition engine_ (or engines) that you want
+//! <span class="fredoka-title" style="font-size: 1rem;">dendroverse<span class="gradient-title">.rs</span></span> to use.
+//! Each engine introduces a list of new dependencies, so to avoid adding unnecessary ones to your project, we've disabled them all by default.
 //! So, don't forget to opt in!
 //!
 //! | Feature flag | Description |
 //! |:------------:|-------------|
-//! | `engine-arboretum` | Enables the [`arboretum_td`][arboretum] engine. This is the only supported engine that, alongside heuristics, implements algorithms that guarantee the _optimality_ of tree decompositions, i.e. that construct tree decompositions with width = treewidth. |
+//! | `engine-arboretum` | Enables the [`arboretum_td`][arboretum] engine. This is the only supported engine that implements algorithms alongside heuristics to guarantee _the optimality of tree decompositions_, i.e. to construct tree decompositions with width = treewidth. |
 //! | `engine-goatd` | Enables the [`goatd`][goatd] engine. It implements many heuristics and has proven effective and efficient in many use cases. |
 //!
 //! #### Graph library integrations
 //!
-//! If you use a popular graph library, you might find it tiresome to implement [`DendroverseOgGraphInterface`] for them.
-//! Indeed, Rust doesn't allow traits defined outside your crate to be implemented for types defined outside your crate.
-//! Thus, if you wish to use a graph type from a third-party library with `dendroverse.rs`, you'll have to look for workarounds, e.g.
-//! declaring a wrapper type, which is ugly.
-//! For this reason, we've integrated popular graph libraries for you.
+//! If you use a popular graph library, you may find it tedious to implement [`DendroverseOgGraphInterface`] for it.
+//! This is because Rust doesn't allow traits defined outside your crate to be implemented for types defined outside your crate.
+//! Therefore, if you want to use a graph type from a third-party library with
+//! <span class="fredoka-title" style="font-size: 1rem;">dendroverse<span class="gradient-title">.rs</span></span>, you'll have to
+//! find a workaround, such as declaring a wrapper type, which is not ideal.
+//! For this reason, we have integrated popular graph libraries for you.
 //!
 //! | Feature flag | Description |
 //! |:------------:|-------------|
-//! | `integrate-petgraph` | Integrates [`petgraph`][petgraph]. If your original graph is of type `petgraph::Graph<_, _, petgraph::Undirected, _>`, then you don't need to create a derivative type in your project and manually implement [`DendroverseOgGraphInterface`] for it. Instead, you can use your graph directly with `dendroverse.rs` by enabling this feature flag. |
+//! | `integrate-petgraph` | Integrates [`petgraph`][petgraph]. If your original graph is of type `petgraph::Graph<_, _, petgraph::Undirected, _>`, then you don't need to create a derivative type in your project and manually implement [`DendroverseOgGraphInterface`] for it. Instead, you can use your graph directly with <span class="fredoka-title" style="font-size: 1rem;">dendroverse<span class="gradient-title">.rs</span></span> after enabling this feature flag. |
 //!
 //! ## 🤓 Examples
 //!
-//! Examples of using `dendroverse.rs` can be found among our [integration tests][examples].
+//! Examples of using
+//! <span class="fredoka-title" style="font-size: 1rem;">dendroverse<span class="gradient-title">.rs</span></span>
+//! can be found among our [integration tests][examples].
 //! There, we've implemented two algorithms for finding a maximum independent set.
 //! One uses arbitrary directed tree decompositions, the other relies on nice tree decompositions.
 //!
 //! ## 📑 Future plans
 //!
-//! The following features are planned for `dendroverse.rs`:
-//! * **Custom tree decompositions.** Currently, only automatically generated tree decompositions can be used with `dendroverse.rs`.
+//! The following features are planned for <span class="fredoka-title" style="font-size: 1rem;">dendroverse<span class="gradient-title">.rs</span></span> v0.4.0:
+//! * **Custom tree decompositions.** Currently, only automatically generated tree decompositions can be used with
+//! <span class="fredoka-title" style="font-size: 1rem;">dendroverse<span class="gradient-title">.rs</span></span>.
 //! See the documentation for [`DendroverseInstance`] for more detail.
 //! * **Solutions without backtracking.** When we solve optimisation problems on graphs, it's sometimes sufficient to retrieve an optimal objective
 //! value from the tree decomposition's root node.
@@ -141,6 +152,8 @@
 //! [goatd]: https://docs.rs/goatd/latest/goatd/index.html
 //! [petgraph]: https://docs.rs/petgraph/latest/petgraph/
 //! [examples]: https://github.com/forallthereis/dendroverse/tree/master/tests
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 use std::collections::VecDeque;
 
 #[cfg(feature = "integrate-petgraph")]
@@ -155,24 +168,47 @@ mod solve;
 
 /// # Instance of a problem to be solved
 ///
-/// This struct is your 'access point' to the most important functionality of `dendroverse.rs`.
+/// <style>
+///     @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500&display=swap');
+///
+///     .fredoka-title {
+///         font-family: "Fredoka", sans-serif;
+///         font-optical-sizing: auto;
+///         font-weight: 500;
+///         font-size: 6vw;
+///         font-style: normal;
+///         font-variation-settings: "wdth" 100;
+///         margin: 0;
+///         text-align: center;
+///     }
+///
+///     .gradient-title {
+///         background: #DF0000;
+///         background: linear-gradient(to bottom, #DF0000 0%, #850000 100%);
+///         -webkit-background-clip: text;
+///         -webkit-text-fill-color: transparent;
+///     }
+/// </style>
+///
+/// This struct is your 'access point' to the most important functionality of
+/// <span class="fredoka-title" style="font-size: 1rem;">dendroverse<span class="gradient-title">.rs</span></span>.
 /// It defines an instance of a computational problem you'd like to solve using dynamic programming over tree decompositions.
 ///
 /// ## Creating a new instance
 ///
 /// Currently, you have the following options to create a new `DendroverseInstance`:
 /// * [`DendroverseInstance::<MemoType, _>::with_auto_generated_dtd(...)`][auto_dtds]
-/// Use this when you have an original graph and you want to solve your problem using dynamic programming over **arbitrary** directed tree decompositions.
-/// This function will generate an optimal directed tree decomposition for your graph automatically.
-/// Note that if you want to use this option, your data must satisfy the following additional requirements:
-///     * Your original graph must be of type that implements [`DendroverseOgGraphInterface`].
-///     * Your `MemoType` must implement `Default` and [`DTDMemo`].
+/// Use this when:
+///     * Your dynamic programming algorithm can work over arbitrary directed tree decompositions.
+///     * You don't have a tree decomposition for your original graph prepared in advance and want to generate it automatically.
+///     * You implemented [`DendroverseOgGraphInterface`] for your original graph type (unless [it's already implemented by us][featflags]).
+///     * You implemented `Default` and [`DTDMemo`] for your `MemoType`.
 /// * [`DendroverseInstance::<MemoType, _>::with_auto_generated_nice_dtd(...)`][auto_nice_dtds]
-/// Use this when you have an original graph and you want to solve your problem using dynamic programming over **nice** tree decompositions.
-/// This function will generate an optimal nice tree decomposition for your graph automatically.
-/// Note that if you want to use this option, your data must satisfy the following additional requirements:
-///     * Your original graph must be of type that implements [`DendroverseOgGraphInterface`].
-///     * Your `MemoType` must implement `Default` and [`NiceDTDMemo`].
+/// Use this when:
+///     * Your dynamic programming algorithm requires nice tree decompositions.
+///     * You don't have a tree decomposition for your original graph prepared in advance and want to generate it automatically.
+///     * You implemented [`DendroverseOgGraphInterface`] for your original graph type (unless [it's already implemented by us][featflags]).
+///     * You implemented `Default` and [`NiceDTDMemo`] for your `MemoType`.
 ///
 /// ## Solving an instance
 ///
@@ -193,6 +229,7 @@ mod solve;
 ///
 /// [auto_dtds]: DendroverseInstance::with_auto_generated_dtd
 /// [auto_nice_dtds]: DendroverseInstance::with_auto_generated_nice_dtd
+/// [featflags]: crate#graph-library-integrations
 /// [solve_dtds]: DendroverseInstance::solve_using_dtd
 /// [solve_nice_dtds]: DendroverseInstance::solve_using_nice_dtd
 /// [soln]: DendroverseInstance::solution
@@ -211,7 +248,6 @@ where
     MemoType: Send + Sync,
     AdditionalDataType: Sync,
 {
-
     /// Creates a new `DendroverseInstance` with automatically generated directed tree decompositions for the given original graph.
     ///
     /// Here, the arguments are as follows:
@@ -221,7 +257,7 @@ where
     /// Data that can be immutably accessed from a node payload function during the solution process to check the local feasibility of
     /// the newly constructed memo entries.
     /// * `algo`
-    /// A selector of an algorithm to be used for the tree decomposition computation.
+    /// A selector of an algorithm to be used for the automatic generation of a tree decomposition.
     /// See the documentation for [`DTDGenerationAlgorithm`] for more detail.
     ///
     /// Note that a separate tree decomposition will be generated for each connected component of `og_graph`.
@@ -257,7 +293,7 @@ where
     /// Data that can be immutably accessed from a node payload function during the solution process to check the local feasibility of
     /// the newly constructed memo entries.
     /// * `algo`
-    /// A selector of an algorithm to be used for the tree decomposition computation.
+    /// A selector of an algorithm to be used for the automatic generation of a tree decomposition.
     /// See the documentation for [`DTDGenerationAlgorithm`] for more detail.
     ///
     /// Note that a separate nice tree decomposition will be generated for each connected component of `og_graph`.
@@ -299,7 +335,6 @@ where
     where
         MemoType: DTDMemo<AdditionalDataType>,
     {
-
         if self.is_instance_solved {
             return Ok(());
         }
@@ -314,7 +349,6 @@ where
         self.is_instance_solved = true;
 
         result
-
     }
 
     /// Solves the `DendroverseInstance` using dynamic programming over nice tree decompositions.
@@ -335,7 +369,6 @@ where
     where
         MemoType: NiceDTDMemo<AdditionalDataType>,
     {
-
         if self.is_instance_solved {
             return Ok(());
         }
@@ -350,7 +383,6 @@ where
         self.is_instance_solved = true;
 
         result
-
     }
 
     /// Retrieves a solution to the solved `DendroverseInstance`.
@@ -410,7 +442,6 @@ where
             .max()
             .unwrap_or(0)
     }
-
 }
 
 
@@ -472,7 +503,6 @@ pub enum DTDGenerationAlgorithm {
 /// component of the original graph will have its own tree decomposition.
 /// During backtracking, all tree decompositions will be processed consecutively, in a single thread.
 pub trait BacktrackableMemo {
-
     /// The type to be used as a hint during backtracking.
     /// This is useful for backlinking.
     /// Specifically, when backlinking is used, each entry stored in a node's memo also records the IDs of the entries
@@ -528,7 +558,6 @@ pub trait BacktrackableMemo {
         hint: Option<Self::BacktrackingHint>,
         children_nids: &Vec<usize>
     ) -> (Option<Self::PartialSolutionType>, Vec<Option<Self::BacktrackingHint>>);
-
 }
 
 
@@ -537,15 +566,12 @@ fn backtrack_solution_from_root_nodes<MemoType>(dtds: &Vec<dtd::DirectedTreeDeco
 where
     MemoType: BacktrackableMemo,
 {
-
     let mut partial_solution = Some(MemoType::PartialSolutionType::default());
 
     for dtd in dtds.iter() {
-
         let mut node_queue: VecDeque<(usize, Option<MemoType::BacktrackingHint>)> = VecDeque::from([(dtd.root_nid, None)]);
 
         while !node_queue.is_empty() {
-
             let (nid, hint) = node_queue.pop_front().unwrap();
             let memo = unsafe{ &dtd.nodes.get_unchecked(nid).lock().unwrap().memo };
             let children_nids = unsafe { &dtd.adj_list.get_unchecked(nid).children_nids };
@@ -563,13 +589,10 @@ where
             }
 
             node_queue.extend(children_nids.iter().cloned().zip(children_hints.into_iter()));
-
         }
-
     }
 
     partial_solution.unwrap().try_into().ok()
-
 }
 
 
@@ -579,7 +602,6 @@ where
 /// Implement this trait for your original graph type if you intend to generate tree decompositions for it
 /// automatically.
 pub trait DendroverseOgGraphInterface {
-
     /// Must return the number of vertices in the graph.
     fn vertices_count(&self) -> usize;
 
@@ -588,7 +610,6 @@ pub trait DendroverseOgGraphInterface {
     /// Each edge must be represented by a 2-tuple `(usize, usize)` whose elements are the IDs of the vertices incident on it.
     /// Each edge must be undirected, the order of vertices is not important.
     fn iter_edges(&self) -> impl Iterator<Item = (usize, usize)>;
-
 }
 
 #[cfg(feature = "integrate-petgraph")]
@@ -596,7 +617,6 @@ impl<N, E, Ix> DendroverseOgGraphInterface for petgraph::Graph<N, E, petgraph::U
 where
     Ix: petgraph::stable_graph::IndexType,
 {
-
     fn vertices_count(&self) -> usize {
         self.node_count()
     }
@@ -604,7 +624,6 @@ where
     fn iter_edges(&self) -> impl Iterator<Item = (usize, usize)> {
         self.edge_references().map(|e| (e.source().index(), e.target().index()))
     }
-
 }
 
 
@@ -617,7 +636,6 @@ where
 ///
 /// Note also that you don't have to implement [`NiceDTDMemo`] in order to implement `DTDMemo` for your `MemoType`.
 pub trait DTDMemo<AdditionalDataType> {
-
     /// Must populate the memo of a node.
     ///
     /// The memo to be populated is `self`.
@@ -649,7 +667,6 @@ pub trait DTDMemo<AdditionalDataType> {
         children_memos: Vec<&Self>,
         additional_data: &AdditionalDataType,
     );
-
 }
 
 
@@ -662,7 +679,6 @@ pub trait DTDMemo<AdditionalDataType> {
 ///
 /// Note also that you don't have to implement [`DTDMemo`] in order to implement `NiceDTDMemo` for your `MemoType`.
 pub trait NiceDTDMemo<AdditionalDataType> {
-
     /// Must populate the memo of a leaf node.
     ///
     /// The memo (`self`) is guaranteed to belong to a leaf node.
@@ -746,5 +762,4 @@ pub trait NiceDTDMemo<AdditionalDataType> {
         child2_memo: &Self,
         additional_data: &AdditionalDataType,
     );
-
 }

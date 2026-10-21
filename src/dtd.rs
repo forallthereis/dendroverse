@@ -18,7 +18,6 @@ pub(super) struct DirectedTreeDecomposition<MemoType> {
 
 #[allow(unused)]
 impl<'a, MemoType> DirectedTreeDecomposition<MemoType> {
-
     /// Adds a new node to a directed tree decomposition and returns its node ID
     fn add_node(&'a mut self, parent_nid: Option<usize>, bag: Vec<usize>, memo: MemoType) -> usize {
         self.adj_list.push(DTDNodeConnectivity { parent_nid, children_nids: Vec::new() });
